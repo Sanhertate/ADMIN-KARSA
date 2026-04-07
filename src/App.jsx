@@ -340,7 +340,7 @@ function AdminDashboard({ onLogout }) {
                 phone: getVal(k, ['nomor hp', 'nomor ponsel', 'no hp', 'phone'], ''), password: getVal(k, ['kata sandi', 'sandi', 'password'], '123456'), photo: getVal(k, ['foto', 'photo'], ''),
                 tempatLahir: getVal(k, ['tempat lahir', 'tempatlahir']), tanggalLahir: getVal(k, ['tanggal lahir', 'dob', 'tanggallahir']), jenisKelamin: getVal(k, ['jenis kelamin', 'gender']),
                 statusKawin: getVal(k, ['status perkawinan', 'statuskawin']), golDarah: getVal(k, ['golongan darah', 'goldarah']), agama: getVal(k, ['agama', 'religion']),
-                noKtp: getVal(k, ['id ktp', 'id kartu identitas', 'ktp']), noKk: getVal(k, ['id kartu keluarga', 'nomor kartu keluarga', 'kk']), email: getVal(k, ['email']),
+                noKtp: getVal(k, ['nik ktp', 'no ktp', 'noktp', 'id ktp', 'id kartu identitas', 'ktp']), noKk: getVal(k, ['id kartu keluarga', 'nomor kartu keluarga', 'kk']), email: getVal(k, ['email']),
                 alamat: getVal(k, ['alamat', 'addressdetail']), provinsi: getVal(k, ['provinsi']), kota: getVal(k, ['kota', 'kabupaten']), pendidikan: getVal(k, ['jenjang pendidikan terakhir', 'pendidikan', 'education'], '-'),
                 prodi: getVal(k, ['program studi', 'prodi']), tglGabung: getVal(k, ['awal bergabung', 'tanggal bergabung', 'tglgabung', 'tanggal mulai bekerja']), tglBerakhir: getVal(k, ['akhir bergabung', 'tanggal berakhir']),
                 hariKerja: getVal(k, ['hari kerja', 'hk'], '-'), gaji: getVal(k, ['gaji', 'gapok'])
@@ -718,7 +718,7 @@ function AdminDashboard({ onLogout }) {
              {activeMenu === 'cuti' && (<CutiTicketView list={validCuti} karyawan={data.karyawan} onPhoto={setSelectedPhoto} filterTanggal={filterTanggal} setFilterTanggal={setFilterTanggal} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} uniquePlacements={uniquePlacements} targetDateStr={targetDateStr} onExport={() => {
                      const currentYear = new Date().getFullYear(); const exportRows = []; const cutiStats = {};
                      safeArray(data.karyawan).forEach(k => { if(k && k.id) cutiStats[String(k.id)] = { taken: 0, sisa: 12 }; });
-                     safeArray(validCuti).forEach(c => { if (!c || !c.userId) return; const type = String(c.type || '').toLowerCase(); const status = String(c.status || '').toLowerCase(); if (type.includes('cuti') && !status.includes('reject') && !status.includes('tolak')) { const { startDate, days } = hitungDurasiHari(c.start); if (startDate && startDate.getFullYear() === currentYear && cutiStats[String(c.userId)]) { cutiStats[String(c.userId)].taken += days; cutiStats[String(c.userId)].sisa = 12 - cutiStats[String(c.userId)].taken; } } });
+                     safeArray(validCuti).forEach(c => { if (!c || !c.userId) return; const type = String(c.type || '').toLowerCase(); const status = String(c.status || '').toLowerCase(); if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) { const { startDate, days } = hitungDurasiHari(c.start); if (startDate && startDate.getFullYear() === currentYear && cutiStats[String(c.userId)]) { cutiStats[String(c.userId)].taken += days; cutiStats[String(c.userId)].sisa = 12 - cutiStats[String(c.userId)].taken; } } });
                      safeArray(validCuti).forEach(c => {
                         let matchDate = true; if (filterTanggal) { const tDate = parseRobustDate(targetDateStr); if (tDate) matchDate = isDateInRange(tDate, c.start); else matchDate = String(c.start || '').toLowerCase().includes(String(filterTanggal).toLowerCase()); }
                         const matchDiv = filterDivisi === 'Semua' || c.role === filterDivisi; const matchPen = filterPenempatan === 'Semua' || c.penempatan === filterPenempatan;
@@ -1003,7 +1003,7 @@ function KaryawanTable({ list, validCuti, onDetail, onAdd, onDelete, filterDivis
        if (!c || !c.userId) return;
        const type = String(c.type || '').toLowerCase();
        const status = String(c.status || '').toLowerCase();
-       if (type.includes('cuti') && !status.includes('reject') && !status.includes('tolak')) {
+       if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) {
            const { startDate, days } = hitungDurasiHari(c.start || c.tanggal || c.date);
            const uid = String(c.userId);
            if (startDate && startDate.getFullYear() === currentYear) { 
@@ -1287,7 +1287,7 @@ function ProfilPegawaiModal({ personel, onClose, onEdit }) {
                            <DetailItem label="Status Nikah" value={String(personel.statusKawin || '-')} />
                         </div>
                         <DetailItem label="ID-PEGAWAI" value={String(personel.id || '-')} />
-                        <DetailItem label="No. KTP" value={String(personel.noKtp || '-')} />
+                        <DetailItem label="NIK KTP" value={String(personel.noKtp || '-')} />
                         <div className="col-span-2"><DetailItem label="No. Kartu Keluarga" value={String(personel.noKk || '-')} /></div>
                         <div className="col-span-2"><DetailItem label="Pendidikan Terakhir" value={String(personel.pendidikan || personel.education || '-')} /></div>
                         <div className="col-span-2"><DetailItem label="Program Studi" value={String(personel.prodi || '-')} /></div>
@@ -1387,7 +1387,7 @@ function CutiTicketView({ list, karyawan, onPhoto, filterTanggal, setFilterTangg
        if (!c || !c.userId) return;
        const type = String(c.type || '').toLowerCase();
        const status = String(c.status || '').toLowerCase();
-       if (type.includes('cuti') && !status.includes('reject') && !status.includes('tolak')) {
+       if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) {
            const { startDate, days } = hitungDurasiHari(c.start || c.tanggal || c.date);
            const uid = String(c.userId);
            if (startDate && startDate.getFullYear() === currentYear && stats[uid]) { 
@@ -1433,7 +1433,6 @@ function CutiTicketView({ list, karyawan, onPhoto, filterTanggal, setFilterTangg
                 const userStat = cutiStats[String(c.userId)] || { taken: 0, sisa: 12 };
                 const { days } = hitungDurasiHari(c.start || c.tanggal || c.date);
                 
-                // Pemisahan Tanggal Mulai dan Selesai
                 const rawDate = String(c.start || c.tanggal || c.date || '');
                 let startD = formatDateUI(rawDate);
                 let endD = formatDateUI(rawDate);
@@ -1444,7 +1443,6 @@ function CutiTicketView({ list, karyawan, onPhoto, filterTanggal, setFilterTangg
                 else if (rawLower.includes(' sampai ')) { const p = rawLower.split(' sampai '); startD = formatDateUI(p[0]); endD = formatDateUI(p[1]); }
                 else if (rawLower.includes(' - ')) { const p = rawLower.split(' - '); startD = formatDateUI(p[0]); endD = formatDateUI(p[1]); }
 
-                // Peningkatan Badge Warna Berdasarkan Kategori yang Ada di Aplikasi Pegawai
                 let badgeStyle = 'bg-gray-50 text-gray-700 border-gray-200';
                 const typeLower = String(c.type || '').toLowerCase();
                 if (typeLower.includes('sakit')) badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200';
@@ -1480,7 +1478,7 @@ function CutiTicketView({ list, karyawan, onPhoto, filterTanggal, setFilterTangg
                     <div className="text-gray-700 text-sm whitespace-pre-wrap mt-1"><span className="text-xs font-semibold text-gray-500 block mb-0.5">Alasan:</span>{String(c.reason || c.pesan || c.teks || '-')}</div>
                   </td>
                   <td className="px-6 py-4 align-top text-center">
-                    {typeLower.includes('cuti') ? (
+                    {typeLower.includes('cuti') && !typeLower.includes('melahirkan') ? (
                        <div className="inline-flex flex-col gap-1 items-center bg-gray-50 p-2 rounded border border-gray-200">
                          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Tiket Cuti</span>
                          <span className="text-xs text-gray-500">Telah Diambil: <strong className="text-gray-900">{String(userStat.taken)} Hari</strong></span>
