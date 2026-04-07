@@ -16,7 +16,12 @@ import {
 // ==========================================
 // KONEKSI DATABASE & KONFIGURASI
 // ==========================================
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwERT8qauFuVIET-kOfyn5LIHqyZd4Dil7uCONPFY9SYPWfi3RowtRrKA3iGmjiS4GZ/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzqdavtaSSAvPaHKxn0cHscXmBqzAoegk7eY2QDivjfkr4Fz5NNlebI79ZlPKrrft1s/exec";
+
+// NAMA INSTANSI / PERUSAHAAN & LOGO
+const APP_NAME = "Admin HRD";
+const COMPANY_NAME = "PT. Karsa Sentana Lumbung Sentosa";
+const LOGO_URL = "https://karsasentana.com/wp-content/uploads/2026/01/LOGO-KARSA-SENTANA-2-1024x896.png";
 
 // TANGGAL RILIS APLIKASI - Mencegah hitungan Alpa sebelum aplikasi digunakan
 const TANGGAL_RILIS_APLIKASI = new Date('2026-04-01');
@@ -134,7 +139,8 @@ const exportDataToExcel = (dataToExport, title, filename, todayStrReal) => {
 const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr) => {
   let tHadir = 0, tTelat = 0, tIzin = 0, tSakit = 0, tCuti = 0, tLibur = 0, tAlpha = 0;
   const allDates = new Set();
-  const karAbsen = safeArray(allAbsensi).filter(a => a && String(a.userId) === String(personel?.id || personel?.userId));
+  const targetUid = String(personel?.id || personel?.userId || '').trim().toUpperCase();
+  const karAbsen = safeArray(allAbsensi).filter(a => a && String(a.userId).trim().toUpperCase() === targetUid);
   
   let joinDate = parseRobustDate(personel?.tglGabung);
   let firstDateActive = null;
@@ -177,7 +183,7 @@ const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr
       let isKembaliLate = false, matchedCuti = null;
       
       safeArray(validCuti).forEach(c => {
-         if(String(c.userId) === String(personel?.id || personel?.userId)) { if (isDateInRange(dObj, c.start || c.tanggal || c.date)) { matchedCuti = c; } }
+         if(String(c.userId).trim().toUpperCase() === targetUid) { if (isDateInRange(dObj, c.start || c.tanggal || c.date)) { matchedCuti = c; } }
       });
 
       if (matchedCuti) {
@@ -189,24 +195,29 @@ const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr
           patroli = matchedCuti.reason;
       } else if (absenMatch && String(absenMatch.action).toLowerCase() === 'absen libur') {
           tLibur++; finalStatus = 'LIBUR / OFF'; bgStyle = 'bg-slate-100 border-slate-300 text-slate-600'; colorStyle = '#9aa0a6';
-      } else if (absenMatch && String(absenMatch.action).toLowerCase().includes('masuk')) {
-          tHadir++; let targetTime = '08:00'; const act = String(absenMatch.action).toLowerCase(); const role = personel?.role || 'Umum';
-          if (role === 'Umum') targetTime = appSettings?.Umum_Masuk || '08:00';
-          else if (role === 'Kebersihan') targetTime = appSettings?.Kebersihan_Masuk || '06:00';
-          else if (role === 'Sekuriti') targetTime = appSettings?.Sekuriti_Pagi || '07:00';
-          if (role === 'Sekuriti' && act.includes('malam')) targetTime = appSettings?.Sekuriti_Malam || '19:00';
-          else if (role === 'Kesehatan') {
-             targetTime = appSettings?.Kesehatan_Pagi || '07:00';
-             if (act.includes('siang')) targetTime = appSettings?.Kesehatan_Siang || '14:00';
-             if (act.includes('malam')) targetTime = appSettings?.Kesehatan_Malam || '21:00';
+      } else if (absenMatch) {
+          const act = String(absenMatch.action).toLowerCase(); 
+          if (act.includes('istirahat (keluar)') || act.includes('mulai istirahat') || act === 'istirahat') {
+              istirahat = absenMatch.time; finalStatus = 'ISTIRAHAT'; bgStyle = 'bg-gray-100 border-gray-300 text-gray-600';
+          } else if (act.includes('istirahat (masuk)') || act.includes('selesai istirahat') || act === 'kembali') {
+              kembali = absenMatch.time; finalStatus = 'KEMBALI KERJA'; bgStyle = 'bg-indigo-50 border-indigo-200 text-indigo-700';
+          } else if (act.includes('pulang') || act.includes('out') || act.includes('keluar')) {
+              pulang = absenMatch.time; finalStatus = 'PULANG'; bgStyle = 'bg-gray-100 border-gray-300 text-gray-800';
+          } else if (act.includes('patroli')) {
+              patroli = absenMatch.time; finalStatus = 'PATROLI'; bgStyle = 'bg-teal-50 border-teal-200 text-teal-700';
+          } else {
+              tHadir++; let targetTime = '08:00'; const role = personel?.role || 'Umum';
+              if (role === 'Umum') targetTime = appSettings?.Umum_Masuk || '08:00';
+              else if (role === 'Kebersihan') targetTime = appSettings?.Kebersihan_Masuk || '06:00';
+              else if (role === 'Sekuriti') targetTime = act.includes('malam') ? (appSettings?.Sekuriti_Malam || '19:00') : (appSettings?.Sekuriti_Pagi || '07:00');
+              else if (role === 'Kesehatan') targetTime = act.includes('malam') ? (appSettings?.Kesehatan_Malam || '21:00') : (act.includes('siang') ? (appSettings?.Kesehatan_Siang || '14:00') : (appSettings?.Kesehatan_Pagi || '07:00'));
+              
+              const parseTimeWithSeconds = (tStr) => { if(!tStr || tStr==='-') return 0; const match = String(tStr).match(/(\d+)[.:](\d+)/); if (!match) return 0; return (parseInt(match[1]) || 0) * 3600 + (parseInt(match[2]) || 0) * 60; };
+              const isLate = parseTimeWithSeconds(absenMatch.time) > parseTimeWithSeconds(targetTime);
+              if (isLate) tTelat++;
+              finalStatus = isLate ? 'TERLAMBAT' : 'TEPAT WAKTU'; bgStyle = isLate ? 'bg-red-50 border-red-200 text-red-600' : 'bg-green-50 border-green-200 text-green-700'; colorStyle = '#188038';
+              masuk = absenMatch.time; istirahat = absenMatch.istirahat || '-'; kembali = absenMatch.kembali || '-'; pulang = absenMatch.pulang || '-'; patroli = absenMatch.patroli || '-';
           }
-          
-          const parseTimeWithSeconds = (tStr) => { if(!tStr) return 0; const match = String(tStr).match(/(\d+)[.:](\d+)/); if (!match) return 0; return (parseInt(match[1]) || 0) * 3600 + (parseInt(match[2]) || 0) * 60; };
-          const isLate = parseTimeWithSeconds(absenMatch.time) > parseTimeWithSeconds(targetTime);
-          if (isLate) tTelat++;
-          finalStatus = isLate ? 'TERLAMBAT' : 'TEPAT WAKTU'; bgStyle = isLate ? 'bg-red-50 border-red-200 text-red-600' : 'bg-green-50 border-green-200 text-green-700'; colorStyle = '#188038';
-          masuk = absenMatch.time; istirahat = absenMatch.istirahat || '-'; kembali = absenMatch.kembali || '-'; pulang = absenMatch.pulang || '-'; patroli = absenMatch.patroli || '-';
-          if (kembali !== '-') { let tgt = '13:00'; if (role === 'Umum') tgt = appSettings?.Umum_Kembali || '13:00'; if (parseTimeWithSeconds(kembali) > parseTimeWithSeconds(tgt)) isKembaliLate = true; }
       } else if (isWeekend) {
           tLibur++; finalStatus = 'AKHIR PEKAN'; bgStyle = 'bg-slate-100 border-slate-300 text-slate-600'; colorStyle = '#64748b';
       } else {
@@ -269,10 +280,10 @@ function AdminLogin({ onLogin }) {
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 font-sans text-left">
       <div className="w-full max-w-[450px] bg-white rounded-xl p-10 border border-gray-300">
         <div className="flex justify-center mb-6">
-           <img src="https://karsasentana.com/wp-content/uploads/2026/01/LOGO-KARSA-SENTANA-2-1024x896.png" alt="Logo Karsa Sentana" className="h-24 w-auto object-contain drop-shadow-sm" />
+           <img src={LOGO_URL} alt="Logo" className="h-24 w-auto object-contain drop-shadow-sm" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">Admin</h1>
-        <p className="text-sm text-gray-500 text-center mb-8">PT. Karsa Sentana Lumbung Sentosa</p>
+        <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">{APP_NAME}</h1>
+        <p className="text-sm text-gray-500 text-center mb-8">{COMPANY_NAME}</p>
         <form onSubmit={handleLogin} className="space-y-5 text-left">
           <input type="text" value={id} onChange={(e)=>setId(e.target.value)} required placeholder="Username Admin" className="w-full bg-transparent border border-gray-300 p-3.5 rounded text-base text-gray-900 outline-none focus:ring-2 focus:ring-[#1a73e8]" />
           <input type="password" value={pass} onChange={(e)=>setPass(e.target.value)} required placeholder="Kata Sandi" className="w-full bg-transparent border border-gray-300 p-3.5 rounded text-base text-gray-900 outline-none focus:ring-2 focus:ring-[#1a73e8]" />
@@ -331,7 +342,8 @@ function AdminDashboard({ onLogout }) {
       if(result.status === 'success') {
         const rawKaryawan = safeArray(result.karyawan).map(k => {
             if (!k) return null;
-            const empId = getVal(k, ['id karyawan', 'is karyawan', 'nik', 'id', 'no'], Math.random().toString(36).substr(2, 9));
+            // Penambahan opsi pembacaan id pegawai yang lebih luas
+            const empId = getVal(k, ['id-pegawai', 'id pegawai', 'id karyawan', 'is karyawan', 'nik', 'id', 'no'], Math.random().toString(36).substr(2, 9));
             const empName = getVal(k, ['nama lengkap sesuai ktp', 'nama pegawai', 'nama', 'pegawai', 'name'], 'Unknown');
             return {
                 ...k, id: empId, name: empName,
@@ -350,6 +362,7 @@ function AdminDashboard({ onLogout }) {
         const karyawanMap = new Map();
         rawKaryawan.forEach(k => { 
             if(k && k.id) {
+               // Normalisasi ID Karyawan
                karyawanMap.set(String(k.id).trim().toUpperCase(), k); 
             }
         });
@@ -359,19 +372,19 @@ function AdminDashboard({ onLogout }) {
         const normalizedCuti = safeArray(result.cuti).map(c => {
             if (!c) return null;
             const empName = getVal(c, ['nama pegawai', 'nama', 'name'], 'Unknown');
-            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: getVal(c, ['id karyawan', 'nik', 'userid', 'id'], empName), name: empName, type: getVal(c, ['jenis pengajuan', 'jenis', 'type'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: getVal(c, ['lampiran', 'foto', 'file'], '') };
+            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: getVal(c, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), name: empName, type: getVal(c, ['jenis pengajuan', 'jenis', 'type'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: getVal(c, ['lampiran', 'foto', 'file'], '') };
         }).filter(Boolean);
 
         const normalizedLaporan = safeArray(result.laporan).map(l => {
             if (!l) return null;
             const empName = getVal(l, ['nama', 'nama pegawai', 'name'], 'Unknown');
-            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: getVal(l, ['id karyawan', 'nik', 'userid', 'id'], empName), nama: empName, waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date'], fallbackDateStr), photo: getVal(l, ['lampiran', 'foto', 'file'], '') };
+            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: getVal(l, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), nama: empName, waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), photo: getVal(l, ['lampiran', 'foto', 'file'], '') };
         }).filter(Boolean);
 
         const normalizedAbsensi = safeArray(result.absensi).map(a => {
             if (!a) return null;
             const empName = getVal(a, ['nama', 'nama pegawai', 'username', 'name'], 'Unknown');
-            return { ...a, userId: getVal(a, ['id karyawan', 'nik', 'userid', 'id'], empName), userName: empName, date: getVal(a, ['tanggal', 'date'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action'], '-'), photo: getVal(a, ['lampiran', 'foto', 'file'], '') };
+            return { ...a, userId: getVal(a, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), userName: empName, date: getVal(a, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action', 'keterangan'], '-'), photo: getVal(a, ['lampiran', 'foto', 'file', 'image'], '') };
         }).filter(Boolean);
 
         setData({ karyawan: normalizedKaryawan, absensi: normalizedAbsensi, laporan: normalizedLaporan, pesan: safeArray(result.pesan), cuti: normalizedCuti, broadcast: safeArray(result.broadcast) });
@@ -407,10 +420,11 @@ function AdminDashboard({ onLogout }) {
       
       return combined.filter(c => {
          if (!c || !c.userId) return false;
-         const id = c.id || `${c.userId}-${c.reason}`;
+         const id = c.id || `${String(c.userId).trim().toUpperCase()}-${c.reason}`;
          if(seen.has(id)) return false; seen.add(id); return true;
       }).map(c => {
-         const kInfo = safeArray(data.karyawan).find(emp => String(emp.id) === String(c.userId)) || {};
+         const targetUid = String(c.userId).trim().toUpperCase();
+         const kInfo = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid) || {};
          return { ...c, role: kInfo.role || '-', penempatan: kInfo.penempatan || '-', name: kInfo.name || c.name };
       }).reverse();
     } catch(e) { return []; }
@@ -419,7 +433,8 @@ function AdminDashboard({ onLogout }) {
   const validLaporan = useMemo(() => {
     try {
         return safeArray(data.laporan).map(l => {
-            const kInfo = safeArray(data.karyawan).find(emp => String(emp.id) === String(l.userId)) || {};
+            const targetUid = String(l.userId).trim().toUpperCase();
+            const kInfo = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid) || {};
             return { ...l, role: kInfo.role || '-', penempatan: kInfo.penempatan || '-', nama: kInfo.name || l.nama };
         });
     } catch(e) { return []; }
@@ -453,8 +468,9 @@ function AdminDashboard({ onLogout }) {
 
       safeArray(data.karyawan).forEach(k => {
          if (!k || !k.id) return;
-         groups[k.id] = { 
-            id: k.id, userId: k.id, userName: k.name, date: targetDateStrForGroup, role: k.role, penempatan: k.penempatan, photo: k.photo, pekerjaan: k.pekerjaan,
+         const uid = String(k.id).trim().toUpperCase();
+         groups[uid] = { 
+            id: k.id, userId: uid, userName: k.name, date: targetDateStrForGroup, role: k.role, penempatan: k.penempatan, photo: null, profilePhoto: k.photo, pekerjaan: k.pekerjaan,
             masuk: '-', istirahat: '-', kembali: '-', pulang: '-', patroli: '-', isLate: false, lateText: '', pengajuan: null, hasRecord: false, statusText: '-', bgStyle: 'bg-gray-50 border-transparent text-gray-400', tglGabung: k.tglGabung
          };
       });
@@ -467,12 +483,13 @@ function AdminDashboard({ onLogout }) {
         else matchDate = String(a.date || '').toLowerCase() === String(targetDateStrForGroup || '').toLowerCase();
         if (!matchDate) return; 
 
-        const uid = a.userId;
+        // PENINGKATAN: Format ID agar pasti cocok
+        const uid = String(a.userId).trim().toUpperCase();
         if (!groups[uid]) {
-           const kInfo = safeArray(data.karyawan).find(emp => String(emp.id) === String(uid)) || {};
+           const kInfo = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === uid) || {};
            groups[uid] = { 
-             id: a.id, userId: uid, userName: a.userName || kInfo.name || '-', date: a.date, role: a.role || kInfo.role || '-', penempatan: a.penempatan || kInfo.penempatan || '-', 
-             photo: kInfo.photo || null, pekerjaan: kInfo.pekerjaan || '-', masuk: '-', istirahat: '-', kembali: '-', pulang: '-', patroli: '-', isLate: false, lateText: '', pengajuan: null, hasRecord: false, statusText: '-', bgStyle: 'bg-gray-50 border-transparent text-gray-400', tglGabung: kInfo.tglGabung
+             id: a.id || uid, userId: uid, userName: a.userName || kInfo.name || '-', date: a.date, role: a.role || kInfo.role || '-', penempatan: a.penempatan || kInfo.penempatan || '-', 
+             photo: null, profilePhoto: kInfo.photo || null, pekerjaan: kInfo.pekerjaan || '-', masuk: '-', istirahat: '-', kembali: '-', pulang: '-', patroli: '-', isLate: false, lateText: '', pengajuan: null, hasRecord: false, statusText: '-', bgStyle: 'bg-gray-50 border-transparent text-gray-400', tglGabung: kInfo.tglGabung
            };
         }
         
@@ -480,27 +497,41 @@ function AdminDashboard({ onLogout }) {
         if (a.photo && String(a.photo).trim() !== '') { groups[uid].photo = a.photo; }
         
         const act = String(a.action || '').toLowerCase();
-        if (act === 'absen libur') { groups[uid].pengajuan = 'OFFDAY'; groups[uid].patroli = 'Absen Libur'; groups[uid].statusText = 'LIBUR / OFF SHIFT'; groups[uid].bgStyle = 'bg-slate-100 border-slate-300 text-slate-600'; }
-        else if (act.includes('masuk') || act === 'absen') {
-          groups[uid].masuk = a.time; let targetTime = '08:00'; const role = groups[uid].role;
-          if (role === 'Umum') targetTime = appSettings?.Umum_Masuk || '08:00';
-          else if (role === 'Kebersihan') targetTime = appSettings?.Kebersihan_Masuk || '06:00';
-          else if (role === 'Sekuriti') targetTime = appSettings?.Sekuriti_Pagi || '07:00';
-          if (role === 'Sekuriti' && act.includes('malam')) targetTime = appSettings?.Sekuriti_Malam || '19:00';
-          else if (role === 'Kesehatan') {
-             targetTime = appSettings?.Kesehatan_Pagi || '07:00';
-             if (act.includes('siang')) targetTime = appSettings?.Kesehatan_Siang || '14:00';
-             if (act.includes('malam')) targetTime = appSettings?.Kesehatan_Malam || '21:00';
-          }
-          
-          const actualSecs = parseTimeWithSeconds(a.time); const targetSecs = parseTimeWithSeconds(targetTime);
-          if (actualSecs > 0 && actualSecs > targetSecs) { groups[uid].isLate = true; groups[uid].lateText = formatLateDuration(actualSecs, targetSecs); }
-          groups[uid].statusText = groups[uid].isLate ? 'TERLAMBAT' : 'TEPAT WAKTU'; groups[uid].bgStyle = groups[uid].isLate ? 'bg-red-50 border-red-200 text-red-600' : 'bg-green-50 border-green-200 text-green-700';
+        
+        if (act.includes('libur') || act.includes('off')) { 
+            groups[uid].pengajuan = 'OFFDAY'; groups[uid].patroli = act; groups[uid].statusText = 'LIBUR / OFF SHIFT'; groups[uid].bgStyle = 'bg-slate-100 border-slate-300 text-slate-600'; 
         }
-        else if (act.includes('istirahat (keluar)') || act.includes('mulai istirahat')) groups[uid].istirahat = a.time;
-        else if (act.includes('istirahat (masuk)') || act.includes('selesai istirahat')) groups[uid].kembali = a.time;
-        else if (act.includes('pulang')) { groups[uid].pulang = a.time; if (groups[uid].masuk === '-' && act.includes('malam')) groups[uid].masuk = 'Shift Kemarin'; }
-        else if (act.includes('patroli')) groups[uid].patroli = a.time;
+        else if (act.includes('istirahat (keluar)') || act.includes('mulai istirahat') || act === 'istirahat') {
+            groups[uid].istirahat = a.time;
+        }
+        else if (act.includes('istirahat (masuk)') || act.includes('selesai istirahat') || act === 'kembali') {
+            groups[uid].kembali = a.time;
+        }
+        else if (act.includes('pulang') || act.includes('out') || act.includes('keluar')) { 
+            groups[uid].pulang = a.time; 
+            if (groups[uid].masuk === '-' && act.includes('malam')) groups[uid].masuk = 'Shift Kemarin'; 
+        }
+        else if (act.includes('patroli')) {
+            groups[uid].patroli = a.time;
+        }
+        else {
+            // PENINGKATAN: Apapun actionnya selain pulang/istirahat, akan dideteksi sebagai HADIR (Masuk) jika ada datanya
+            groups[uid].masuk = a.time !== '-' ? a.time : groups[uid].masuk; 
+            let targetTime = '08:00'; const role = groups[uid].role;
+            if (role === 'Umum') targetTime = appSettings?.Umum_Masuk || '08:00';
+            else if (role === 'Kebersihan') targetTime = appSettings?.Kebersihan_Masuk || '06:00';
+            else if (role === 'Sekuriti') targetTime = appSettings?.Sekuriti_Pagi || '07:00';
+            if (role === 'Sekuriti' && act.includes('malam')) targetTime = appSettings?.Sekuriti_Malam || '19:00';
+            else if (role === 'Kesehatan') {
+               targetTime = appSettings?.Kesehatan_Pagi || '07:00';
+               if (act.includes('siang')) targetTime = appSettings?.Kesehatan_Siang || '14:00';
+               if (act.includes('malam')) targetTime = appSettings?.Kesehatan_Malam || '21:00';
+            }
+            
+            const actualSecs = parseTimeWithSeconds(a.time); const targetSecs = parseTimeWithSeconds(targetTime);
+            if (actualSecs > 0 && actualSecs > targetSecs) { groups[uid].isLate = true; groups[uid].lateText = formatLateDuration(actualSecs, targetSecs); }
+            groups[uid].statusText = groups[uid].isLate ? 'TERLAMBAT' : 'TEPAT WAKTU'; groups[uid].bgStyle = groups[uid].isLate ? 'bg-red-50 border-red-200 text-red-600' : 'bg-green-50 border-green-200 text-green-700';
+        }
       });
 
       safeArray(validCuti).forEach(c => {
@@ -509,7 +540,7 @@ function AdminDashboard({ onLogout }) {
          else matchDate = String(c.start || '').toLowerCase().includes(String(targetDateStrForGroup).toLowerCase());
          if (!matchDate) return;
          
-         const uid = c.userId;
+         const uid = String(c.userId).trim().toUpperCase();
          if (groups[uid]) {
             const t = String(c.type || '').toLowerCase(); const r = String(c.reason || '').toLowerCase();
             let pType = 'IZIN';
@@ -525,7 +556,7 @@ function AdminDashboard({ onLogout }) {
          }
       });
 
-      const today = new Date(); today.setHours(0,0,0,0);
+      const todayNow = new Date(); todayNow.setHours(0,0,0,0);
       
       return Object.values(groups).filter(g => {
         const matchDiv = filterDivisi === 'Semua' || g.role === filterDivisi; const matchPen = filterPenempatan === 'Semua' || g.penempatan === filterPenempatan;
@@ -534,12 +565,12 @@ function AdminDashboard({ onLogout }) {
         if (!g.hasRecord && !g.pengajuan) {
             let firstDateActive = parseRobustDate(g.tglGabung);
             if (!firstDateActive) {
-                const karAbsen = safeArray(data.absensi).filter(a => a && String(a.userId) === String(g.userId));
+                const karAbsen = safeArray(data.absensi).filter(a => a && String(a.userId).trim().toUpperCase() === String(g.userId).trim().toUpperCase());
                 karAbsen.forEach(a => { const d = parseRobustDate(a.date); if (d && (!firstDateActive || d < firstDateActive)) { firstDateActive = d; } });
             }
             if (firstDateActive) firstDateActive.setHours(0,0,0,0);
 
-            if (targetDateObjForGroup && targetDateObjForGroup < today) {
+            if (targetDateObjForGroup && targetDateObjForGroup < todayNow) {
                 if (targetDateObjForGroup < TANGGAL_RILIS_APLIKASI) {
                      g.statusText = 'TIDAK DIHITUNG (SEBELUM RILIS)'; g.bgStyle = 'bg-gray-100 text-gray-400 border-gray-200';
                 } else if (!firstDateActive || targetDateObjForGroup >= firstDateActive) {
@@ -552,7 +583,7 @@ function AdminDashboard({ onLogout }) {
                 } else {
                     return false; 
                 }
-            } else if (targetDateObjForGroup && targetDateObjForGroup.getTime() === today.getTime()) {
+            } else if (targetDateObjForGroup && targetDateObjForGroup.getTime() === todayNow.getTime()) {
                 g.statusText = 'BELUM ABSEN'; g.bgStyle = 'bg-gray-50 text-gray-400 border-gray-200';
             } else {
                 return false; 
@@ -616,12 +647,12 @@ function AdminDashboard({ onLogout }) {
   };
 
   const handleEditKaryawan = (updatedForm) => {
-     const originalKaryawan = safeArray(data.karyawan).find(k => String(k.id).trim() === String(updatedForm.id).trim()) || {};
+     const originalKaryawan = safeArray(data.karyawan).find(k => String(k.id).trim().toUpperCase() === String(updatedForm.id).trim().toUpperCase()) || {};
      
      setData(prev => ({
         ...prev, 
         karyawan: safeArray(prev.karyawan).map(k => 
-            String(k.id).trim() === String(updatedForm.id).trim() 
+            String(k.id).trim().toUpperCase() === String(updatedForm.id).trim().toUpperCase() 
             ? { ...k, ...updatedForm } 
             : k
         )
@@ -632,12 +663,12 @@ function AdminDashboard({ onLogout }) {
   };
   
   const handleDeleteKaryawan = (id) => {
-     const idStr = String(id).trim();
+     const idStr = String(id).trim().toUpperCase();
      deletedKaryawanIds.current.add(idStr); 
 
      setData(prev => ({
          ...prev, 
-         karyawan: safeArray(prev.karyawan).filter(k => String(k?.id).trim() !== idStr)
+         karyawan: safeArray(prev.karyawan).filter(k => String(k?.id).trim().toUpperCase() !== idStr)
      })); 
      
      sendAction({action: 'delete_karyawan', id: idStr}); 
@@ -684,8 +715,8 @@ function AdminDashboard({ onLogout }) {
 
       <aside className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white flex flex-col shrink-0 border-r border-gray-200 z-20 overflow-hidden`}>
         <div className="p-4 pl-6 h-16 border-b border-gray-200 flex items-center gap-3 shrink-0">
-           <img src="https://karsasentana.com/wp-content/uploads/2026/01/LOGO-KARSA-SENTANA-2-1024x896.png" alt="Logo" className="w-10 h-10 object-contain" />
-           <div className="flex flex-col"><h1 className="font-bold text-lg text-gray-800 tracking-tight whitespace-nowrap leading-tight">Admin</h1><p className="text-[10px] text-gray-500 whitespace-nowrap">PT. Karsa Sentana Lumbung Sentosa</p></div>
+           <img src={LOGO_URL} alt="Logo" className="w-10 h-10 object-contain" />
+           <div className="flex flex-col"><h1 className="font-bold text-lg text-gray-800 tracking-tight whitespace-nowrap leading-tight">{APP_NAME}</h1><p className="text-[10px] text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{COMPANY_NAME}</p></div>
         </div>
         <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
           <div className="space-y-1"><MenuBtn icon={LayoutDashboard} label="Dashboard" active={activeMenu === 'dashboard'} onClick={() => setActiveMenu('dashboard')} /><MenuBtn icon={Clock} label="Log Absensi" active={activeMenu === 'absensi'} onClick={() => setActiveMenu('absensi')} /><MenuBtn icon={Users} label="Database Pegawai" active={activeMenu === 'karyawan'} onClick={() => setActiveMenu('karyawan')} /></div>
@@ -717,13 +748,14 @@ function AdminDashboard({ onLogout }) {
              {activeMenu === 'karyawan' && (<KaryawanTable list={data.karyawan} validCuti={validCuti} onDetail={setSelectedProfilPersonel} onAdd={() => setIsAddKaryawanOpen(true)} onDelete={handleDeleteKaryawan} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} searchTerm={searchTerm} uniquePlacements={uniquePlacements} />)}
              {activeMenu === 'cuti' && (<CutiTicketView list={validCuti} karyawan={data.karyawan} onPhoto={setSelectedPhoto} filterTanggal={filterTanggal} setFilterTanggal={setFilterTanggal} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} uniquePlacements={uniquePlacements} targetDateStr={targetDateStr} onExport={() => {
                      const currentYear = new Date().getFullYear(); const exportRows = []; const cutiStats = {};
-                     safeArray(data.karyawan).forEach(k => { if(k && k.id) cutiStats[String(k.id)] = { taken: 0, sisa: 12 }; });
-                     safeArray(validCuti).forEach(c => { if (!c || !c.userId) return; const type = String(c.type || '').toLowerCase(); const status = String(c.status || '').toLowerCase(); if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) { const { startDate, days } = hitungDurasiHari(c.start); if (startDate && startDate.getFullYear() === currentYear && cutiStats[String(c.userId)]) { cutiStats[String(c.userId)].taken += days; cutiStats[String(c.userId)].sisa = 12 - cutiStats[String(c.userId)].taken; } } });
+                     safeArray(data.karyawan).forEach(k => { if(k && k.id) cutiStats[String(k.id).trim().toUpperCase()] = { taken: 0, sisa: 12 }; });
+                     safeArray(validCuti).forEach(c => { if (!c || !c.userId) return; const type = String(c.type || '').toLowerCase(); const status = String(c.status || '').toLowerCase(); if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) { const { startDate, days } = hitungDurasiHari(c.start); const uid = String(c.userId).trim().toUpperCase(); if (startDate && startDate.getFullYear() === currentYear && cutiStats[uid]) { cutiStats[uid].taken += days; cutiStats[uid].sisa = 12 - cutiStats[uid].taken; } } });
                      safeArray(validCuti).forEach(c => {
                         let matchDate = true; if (filterTanggal) { const tDate = parseRobustDate(targetDateStr); if (tDate) matchDate = isDateInRange(tDate, c.start); else matchDate = String(c.start || '').toLowerCase().includes(String(filterTanggal).toLowerCase()); }
                         const matchDiv = filterDivisi === 'Semua' || c.role === filterDivisi; const matchPen = filterPenempatan === 'Semua' || c.penempatan === filterPenempatan;
                         if (!matchDate || !matchDiv || !matchPen) return;
-                        exportRows.push({ 'Nama Pegawai': c.name || '-', 'ID-PEGAWAI': c.userId || '-', 'Tipe Pengajuan': c.type || '-', 'Tanggal Mulai': c.start || '-', 'Keterangan / Alasan': c.reason || '-', 'Status': c.status || 'Terkirim', 'Lampiran': c.file ? `<a href="${c.file}" target="_blank">Lihat Bukti</a>` : 'Tidak Ada', 'Sisa Kuota Cuti (Tahun Ini)': cutiStats[String(c.userId)] ? cutiStats[String(c.userId)].sisa + ' Hari' : '-' });
+                        const uid = String(c.userId).trim().toUpperCase();
+                        exportRows.push({ 'Nama Pegawai': c.name || '-', 'ID-PEGAWAI': c.userId || '-', 'Tipe Pengajuan': c.type || '-', 'Tanggal Mulai': c.start || '-', 'Keterangan / Alasan': c.reason || '-', 'Status': c.status || 'Terkirim', 'Lampiran': c.file ? `<a href="${c.file}" target="_blank">Lihat Bukti</a>` : 'Tidak Ada', 'Sisa Kuota Cuti (Tahun Ini)': cutiStats[uid] ? cutiStats[uid].sisa + ' Hari' : '-' });
                      });
                      exportDataToExcel(exportRows, `REKAPITULASI PENGAJUAN CUTI & IZIN - ${targetDateStr || 'Hari Ini'}`, 'Rekap_Cuti_Izin', targetDateStr);
                  }}
@@ -982,7 +1014,7 @@ function AbsensiDetailedTable({ list, onPhoto, onDetail, karyawan, filterTanggal
                      )}
                   </td>
                   <td className="px-6 py-4 text-gray-600">{String(g.istirahat || '-')}</td><td className="px-6 py-4 text-gray-600">{String(g.kembali || '-')}</td><td className="px-6 py-4 font-medium text-gray-900">{String(g.pulang || '-')}</td>
-                  <td className="px-6 py-4 text-right"><button onClick={()=>onDetail(safeArray(karyawan).find(k=>k && String(k.id)===String(g.userId)) || {id:g.userId, name:g.userName})} className="text-[#1a73e8] hover:bg-[#e8f0fe] py-1.5 rounded font-medium text-sm px-3 transition-colors border border-[#1a73e8]">Analisis</button></td>
+                  <td className="px-6 py-4 text-right"><button onClick={()=>onDetail(safeArray(karyawan).find(k=>k && String(k.id).trim().toUpperCase()===String(g.userId).trim().toUpperCase()) || {id:g.userId, name:g.userName})} className="text-[#1a73e8] hover:bg-[#e8f0fe] py-1.5 rounded font-medium text-sm px-3 transition-colors border border-[#1a73e8]">Analisis</button></td>
                 </tr>
               )})}
               {activeList.length === 0 && (<tr><td colSpan="8" className="p-8 text-center text-gray-500">Belum ada kehadiran aktif pada tanggal ini.</td></tr>)}
@@ -998,14 +1030,14 @@ function KaryawanTable({ list, validCuti, onDetail, onAdd, onDelete, filterDivis
   
   const cutiStats = useMemo(() => {
     const stats = {};
-    safeArray(list).forEach(k => { if(k && k.id) stats[String(k.id)] = { taken: 0, sisa: 12 }; });
+    safeArray(list).forEach(k => { if(k && k.id) stats[String(k.id).trim().toUpperCase()] = { taken: 0, sisa: 12 }; });
     safeArray(validCuti).forEach(c => {
        if (!c || !c.userId) return;
        const type = String(c.type || '').toLowerCase();
        const status = String(c.status || '').toLowerCase();
        if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) {
            const { startDate, days } = hitungDurasiHari(c.start || c.tanggal || c.date);
-           const uid = String(c.userId);
+           const uid = String(c.userId).trim().toUpperCase();
            if (startDate && startDate.getFullYear() === currentYear) { 
                if(!stats[uid]) stats[uid] = { taken: 0, sisa: 12 };
                stats[uid].taken += days; 
@@ -1062,11 +1094,11 @@ function KaryawanTable({ list, validCuti, onDetail, onAdd, onDelete, filterDivis
                     <div><p className="text-gray-900 font-medium hover:text-[#1a73e8] transition-colors">{String(k.name || '-')}</p><p className="text-xs text-gray-500 mt-0.5">{String(k.role || '-')}</p></div>
                   </td>
                   <td className="px-6 py-4"><p className="text-sm font-medium text-gray-900">{String(k.id || '-')}</p></td>
-                  <td className="px-6 py-4">{k.phone && k.phone !== '-' ? <a href={formatWA(k.phone)} target="_blank" rel="noreferrer" className="text-[#1a73e8] hover:underline text-sm flex items-center gap-1 mb-1"><PhoneCall size={14}/> {String(k.phone)}</a> : <span className="text-gray-400 block mb-1">-</span>}<p className="text-xs text-gray-400">Pass: {String(k.password || '-')}</p></td>
+                  <td className="px-6 py-4">{k.phone && k.phone !== '-' ? <a href={formatWA(k.phone)} target="_blank" rel="noreferrer" className="text-[#1a73e8] hover:underline text-sm flex items-center gap-1 mb-1"><PhoneCall size={14}/> {String(k.phone)}</a> : <span className="text-gray-400 block mb-1">-</span>}<p className="text-xs text-gray-500">Pass: {String(k.password || '-')}</p></td>
                   <td className="px-6 py-4"><p className="text-sm text-gray-900">{String(k.penempatan || '-')}</p><p className="text-xs text-gray-500 mt-0.5">{String(k.pekerjaan && k.pekerjaan !== '-' ? k.pekerjaan : 'Belum Ditentukan')}</p></td>
                   <td className="px-6 py-4 text-center">
                     <span className="inline-block px-2 py-1 rounded-md text-xs font-bold bg-blue-50 text-[#1a73e8] border border-blue-200">
-                       {cutiStats[String(k.id)] ? cutiStats[String(k.id)].sisa + ' Hari' : '12 Hari'}
+                       {cutiStats[String(k.id).trim().toUpperCase()] ? cutiStats[String(k.id).trim().toUpperCase()].sisa + ' Hari' : '12 Hari'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2"><button onClick={()=>onDetail(k)} className="p-1.5 text-gray-500 hover:text-[#1a73e8] hover:bg-gray-100 rounded transition-colors" title="Detail Pegawai"><Eye size={18}/></button><button onClick={()=>{ if(window.confirm(`Apakah Anda yakin ingin menghapus data pegawai ${k.name}? (Tindakan ini tidak bisa dibatalkan)`)) onDelete(k.id); }} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Hapus Pegawai"><Trash2 size={18}/></button></div></td>
@@ -1382,14 +1414,14 @@ function CutiTicketView({ list, karyawan, onPhoto, filterTanggal, setFilterTangg
   const currentYear = new Date().getFullYear();
   const cutiStats = useMemo(() => {
     const stats = {};
-    safeArray(karyawan).forEach(k => { if(k && k.id) stats[String(k.id)] = { taken: 0, sisa: 12 }; });
+    safeArray(karyawan).forEach(k => { if(k && k.id) stats[String(k.id).trim().toUpperCase()] = { taken: 0, sisa: 12 }; });
     safeArray(list).forEach(c => {
        if (!c || !c.userId) return;
        const type = String(c.type || '').toLowerCase();
        const status = String(c.status || '').toLowerCase();
        if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) {
            const { startDate, days } = hitungDurasiHari(c.start || c.tanggal || c.date);
-           const uid = String(c.userId);
+           const uid = String(c.userId).trim().toUpperCase();
            if (startDate && startDate.getFullYear() === currentYear && stats[uid]) { 
                stats[uid].taken += days; 
                stats[uid].sisa = 12 - stats[uid].taken; 
@@ -1430,7 +1462,7 @@ function CutiTicketView({ list, karyawan, onPhoto, filterTanggal, setFilterTangg
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm text-gray-700 bg-white">
               {filteredList.map((c, i) => {
-                const userStat = cutiStats[String(c.userId)] || { taken: 0, sisa: 12 };
+                const userStat = cutiStats[String(c.userId).trim().toUpperCase()] || { taken: 0, sisa: 12 };
                 const { days } = hitungDurasiHari(c.start || c.tanggal || c.date);
                 
                 const rawDate = String(c.start || c.tanggal || c.date || '');
@@ -1762,7 +1794,6 @@ function StatistikPegawaiModal({ personel, allAbsensi, cuti, appSettings, onClos
   const totalKehadiran = rawStats.tHadir;
   const persentaseKehadiran = totalHadirKerja > 0 ? Math.round((totalKehadiran / totalHadirKerja) * 100) : 0;
 
-  // Fungsi untuk ekspor data spesifik 1 pegawai
   const handleExportSingle = () => {
     const exportRows = [{
       'Nama Pegawai': personel?.name || personel?.userName || '-',
@@ -1809,7 +1840,6 @@ function StatistikPegawaiModal({ personel, allAbsensi, cuti, appSettings, onClos
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {/* Persentase Kehadiran */}
               <div className="md:col-span-1 bg-blue-50 rounded-xl p-6 flex flex-col items-center justify-center border border-blue-100 shadow-sm text-center">
                  <div className="w-32 h-32 rounded-full border-8 border-[#1a73e8] flex items-center justify-center bg-white shadow-inner mb-4">
                     <span className="text-3xl font-bold text-[#1a73e8]">{persentaseKehadiran}%</span>
@@ -1818,7 +1848,6 @@ function StatistikPegawaiModal({ personel, allAbsensi, cuti, appSettings, onClos
                  <p className="text-xs text-gray-500 mt-1">Berdasarkan total hari kerja aktif</p>
               </div>
 
-              {/* Visualisasi Bar Grafik */}
               <div className="md:col-span-2 bg-white rounded-xl p-6 border border-gray-200 shadow-sm flex flex-col justify-center space-y-5">
                   <StatBar label="Hadir Tepat Waktu" value={Math.max(0, rawStats.tHadir - rawStats.tTelat)} color="bg-[#188038]" total={totalHadirKerja} />
                   <StatBar label="Terlambat Masuk" value={rawStats.tTelat} color="bg-[#f29900]" total={totalHadirKerja} />
@@ -1828,7 +1857,6 @@ function StatistikPegawaiModal({ personel, allAbsensi, cuti, appSettings, onClos
               </div>
            </div>
 
-           {/* Info Tambahan */}
            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center"><p className="text-2xl font-bold text-gray-800">{rawStats.tCuti}</p><p className="text-xs font-medium text-gray-500 uppercase mt-1">Total Cuti</p></div>
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center"><p className="text-2xl font-bold text-gray-800">{rawStats.tLibur}</p><p className="text-xs font-medium text-gray-500 uppercase mt-1">Libur / Off Shift</p></div>
@@ -1841,7 +1869,6 @@ function StatistikPegawaiModal({ personel, allAbsensi, cuti, appSettings, onClos
   );
 }
 
-// Helper Grafik Batang
 function StatBar({ label, value, color, total }) {
    const pct = total > 0 ? Math.round((value / total) * 100) : 0;
    return (
