@@ -16,14 +16,12 @@ import {
 // ==========================================
 // KONEKSI DATABASE & KONFIGURASI
 // ==========================================
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzqdavtaSSAvPaHKxn0cHscXmBqzAoegk7eY2QDivjfkr4Fz5NNlebI79ZlPKrrft1s/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwERT8qauFuVIET-kOfyn5LIHqyZd4Dil7uCONPFY9SYPWfi3RowtRrKA3iGmjiS4GZ/exec";
 
-// NAMA INSTANSI / PERUSAHAAN & LOGO
 const APP_NAME = "Admin HRD";
 const COMPANY_NAME = "PT. Karsa Sentana Lumbung Sentosa";
 const LOGO_URL = "https://karsasentana.com/wp-content/uploads/2026/01/LOGO-KARSA-SENTANA-2-1024x896.png";
 
-// TANGGAL RILIS APLIKASI - Mencegah hitungan Alpa sebelum aplikasi digunakan
 const TANGGAL_RILIS_APLIKASI = new Date('2026-04-01');
 TANGGAL_RILIS_APLIKASI.setHours(0,0,0,0);
 
@@ -33,8 +31,6 @@ const DATA_WILAYAH = {
   'Lamandau': { 'Bulik': ['Nanga Bulik', 'Kujan', 'Bumi Agung'], 'Sematu Jaya': ['Tri Tunggal', 'Purwareja'], 'Delang': ['Kudangan'] }
 };
 
-const KABUPATEN_LIST_FULL = Object.keys(DATA_WILAYAH);
-const PENDIDIKAN_LIST = ['SD', 'SMP', 'SMA/SMK', 'D3', 'D4', 'S1', 'S2', 'S3'];
 const PENEMPATAN_LIST_FULL = [
   'RSUD Gusti Abdul Ghani', 'Dinas Lingkungan Hidup dan Kehutanan (DLH-K)', 
   'Kecamatan Sematu Jaya', 'Badan Kepegawaian (BKPSDM)', 'Dinas Perhubungan (DISHUB)', 
@@ -136,11 +132,21 @@ const exportDataToExcel = (dataToExport, title, filename, todayStrReal) => {
   } catch (e) { alert("Error Excel: " + e.message); }
 };
 
-const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr) => {
+const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr, allKaryawanData = []) => {
   let tHadir = 0, tTelat = 0, tIzin = 0, tSakit = 0, tCuti = 0, tLibur = 0, tAlpha = 0;
   const allDates = new Set();
+  
   const targetUid = String(personel?.id || personel?.userId || '').trim().toUpperCase();
-  const karAbsen = safeArray(allAbsensi).filter(a => a && String(a.userId).trim().toUpperCase() === targetUid);
+  // PENINGKATAN: Hilangkan spasi untuk pencocokan nama
+  const targetNameNorm = String(personel?.name || personel?.userName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // PENINGKATAN: Cari absen berdasarkan ID ATAU Nama untuk cegah data siluman
+  const karAbsen = safeArray(allAbsensi).filter(a => {
+      if (!a) return false;
+      const aUid = String(a.userId || '').trim().toUpperCase();
+      const aNameNorm = String(a.userName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return aUid === targetUid || (targetNameNorm !== '' && aNameNorm === targetNameNorm);
+  });
   
   let joinDate = parseRobustDate(personel?.tglGabung);
   let firstDateActive = null;
@@ -180,31 +186,35 @@ const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr
       const absenMatch = karAbsen.find(a => { const ad = parseRobustDate(a.date); return ad && dObj && ad.getTime() === dObj.getTime(); });
 
       let finalStatus = '', bgStyle = '', colorStyle = '', masuk = '-', istirahat = '-', kembali = '-', pulang = '-', patroli = '-';
-      let isKembaliLate = false, matchedCuti = null;
+      let matchedCuti = null;
       
       safeArray(validCuti).forEach(c => {
-         if(String(c.userId).trim().toUpperCase() === targetUid) { if (isDateInRange(dObj, c.start || c.tanggal || c.date)) { matchedCuti = c; } }
+         const cUid = String(c.userId || '').trim().toUpperCase();
+         const cNameNorm = String(c.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+         if(cUid === targetUid || (targetNameNorm !== '' && cNameNorm === targetNameNorm)) { 
+             if (isDateInRange(dObj, c.start || c.tanggal || c.date)) { matchedCuti = c; } 
+         }
       });
 
       if (matchedCuti) {
           const type = String(matchedCuti.type).toLowerCase(); const reason = String(matchedCuti.reason).toLowerCase();
-          if (type.includes('sakit') || type.includes('medis')) { tSakit++; finalStatus = 'SAKIT'; bgStyle = 'bg-purple-50 border-purple-200 text-purple-700'; colorStyle = '#9333ea'; }
-          else if (type.includes('cuti') || type.includes('nikah') || type.includes('duka')) { tCuti++; finalStatus = 'CUTI'; bgStyle = 'bg-blue-50 border-blue-200 text-[#1a73e8]'; colorStyle = '#1a73e8'; }
-          else if (type.includes('off') || type.includes('libur') || reason.includes('off') || reason.includes('libur')) { tLibur++; finalStatus = 'LIBUR / OFF'; bgStyle = 'bg-slate-100 border-slate-300 text-slate-600'; colorStyle = '#9aa0a6'; }
-          else { tIzin++; finalStatus = 'IZIN'; bgStyle = 'bg-yellow-50 border-yellow-200 text-yellow-700'; colorStyle = '#f29900'; }
+          if (type.includes('sakit') || type.includes('medis')) { tSakit++; finalStatus = 'SAKIT'; bgStyle = 'bg-purple-50 text-purple-700'; colorStyle = '#9333ea'; }
+          else if (type.includes('cuti') || type.includes('nikah') || type.includes('duka')) { tCuti++; finalStatus = 'CUTI'; bgStyle = 'bg-blue-50 text-blue-700'; colorStyle = '#1a73e8'; }
+          else if (type.includes('off') || type.includes('libur') || reason.includes('off') || reason.includes('libur')) { tLibur++; finalStatus = 'LIBUR / OFF'; bgStyle = 'bg-slate-100 text-slate-600'; colorStyle = '#9aa0a6'; }
+          else { tIzin++; finalStatus = 'IZIN'; bgStyle = 'bg-yellow-50 text-yellow-700'; colorStyle = '#f29900'; }
           patroli = matchedCuti.reason;
       } else if (absenMatch && String(absenMatch.action).toLowerCase() === 'absen libur') {
-          tLibur++; finalStatus = 'LIBUR / OFF'; bgStyle = 'bg-slate-100 border-slate-300 text-slate-600'; colorStyle = '#9aa0a6';
+          tLibur++; finalStatus = 'LIBUR / OFF'; bgStyle = 'bg-slate-100 text-slate-600'; colorStyle = '#9aa0a6';
       } else if (absenMatch) {
           const act = String(absenMatch.action).toLowerCase(); 
           if (act.includes('istirahat (keluar)') || act.includes('mulai istirahat') || act === 'istirahat') {
-              istirahat = absenMatch.time; finalStatus = 'ISTIRAHAT'; bgStyle = 'bg-gray-100 border-gray-300 text-gray-600';
+              istirahat = absenMatch.time; finalStatus = 'ISTIRAHAT'; bgStyle = 'bg-gray-100 text-gray-600';
           } else if (act.includes('istirahat (masuk)') || act.includes('selesai istirahat') || act === 'kembali') {
-              kembali = absenMatch.time; finalStatus = 'KEMBALI KERJA'; bgStyle = 'bg-indigo-50 border-indigo-200 text-indigo-700';
+              kembali = absenMatch.time; finalStatus = 'KEMBALI KERJA'; bgStyle = 'bg-indigo-50 text-indigo-700';
           } else if (act.includes('pulang') || act.includes('out') || act.includes('keluar')) {
-              pulang = absenMatch.time; finalStatus = 'PULANG'; bgStyle = 'bg-gray-100 border-gray-300 text-gray-800';
+              pulang = absenMatch.time; finalStatus = 'PULANG'; bgStyle = 'bg-gray-100 text-gray-800';
           } else if (act.includes('patroli')) {
-              patroli = absenMatch.time; finalStatus = 'PATROLI'; bgStyle = 'bg-teal-50 border-teal-200 text-teal-700';
+              patroli = absenMatch.time; finalStatus = 'PATROLI'; bgStyle = 'bg-teal-50 text-teal-700';
           } else {
               tHadir++; let targetTime = '08:00'; const role = personel?.role || 'Umum';
               if (role === 'Umum') targetTime = appSettings?.Umum_Masuk || '08:00';
@@ -219,23 +229,23 @@ const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr
               masuk = absenMatch.time; istirahat = absenMatch.istirahat || '-'; kembali = absenMatch.kembali || '-'; pulang = absenMatch.pulang || '-'; patroli = absenMatch.patroli || '-';
           }
       } else if (isWeekend) {
-          tLibur++; finalStatus = 'AKHIR PEKAN'; bgStyle = 'bg-slate-100 border-slate-300 text-slate-600'; colorStyle = '#64748b';
+          tLibur++; finalStatus = 'AKHIR PEKAN'; bgStyle = 'bg-slate-100 text-slate-600'; colorStyle = '#64748b';
       } else {
           if (dObj && dObj < today) {
               if (dObj < TANGGAL_RILIS_APLIKASI) {
-                   finalStatus = 'TIDAK DIHITUNG (SEBELUM RILIS)'; bgStyle = 'bg-gray-100 border-gray-200 text-gray-400'; colorStyle = '#bdc1c6';
+                   finalStatus = 'TIDAK DIHITUNG (SEBELUM RILIS)'; bgStyle = 'bg-gray-100 text-gray-400'; colorStyle = '#bdc1c6';
               } else if (dObj >= startDateForAlpha) {
-                   tAlpha++; finalStatus = 'ALPHA / TANPA KETERANGAN'; bgStyle = 'bg-red-100 border-red-300 text-red-800'; colorStyle = '#991b1b';
+                   tAlpha++; finalStatus = 'ALPHA / TANPA KETERANGAN'; bgStyle = 'bg-red-100 text-red-800'; colorStyle = '#991b1b';
               } else {
-                   finalStatus = '-'; bgStyle = 'bg-gray-50 border-transparent text-gray-400'; colorStyle = '#e5e7eb';
+                   finalStatus = '-'; bgStyle = 'bg-gray-50 text-gray-400'; colorStyle = '#e5e7eb';
               }
           } else if (dObj && dObj.getTime() === today.getTime()) {
-              finalStatus = 'BELUM ABSEN'; bgStyle = 'bg-gray-50 border-gray-200 text-gray-400'; colorStyle = '#bdc1c6';
+              finalStatus = 'BELUM ABSEN'; bgStyle = 'bg-gray-50 text-gray-400'; colorStyle = '#bdc1c6';
           } else {
-              finalStatus = '-'; bgStyle = 'bg-gray-50 border-transparent text-gray-400'; colorStyle = '#e5e7eb';
+              finalStatus = '-'; bgStyle = 'bg-gray-50 text-gray-400'; colorStyle = '#e5e7eb';
           }
       }
-      exportRowsRender.push({ tanggal: formatDateUI(dateStr), masuk, istirahat, kembali, pulang, patroli, statusText: finalStatus, bgStyle, colorStyle, isLate: absenMatch?.isLate || false, isKembaliLate });
+      exportRowsRender.push({ tanggal: formatDateUI(dateStr), masuk, istirahat, kembali, pulang, patroli, statusText: finalStatus, bgStyle, colorStyle, isLate: absenMatch?.isLate || false, isKembaliLate: false });
   });
 
   return { 
@@ -342,7 +352,6 @@ function AdminDashboard({ onLogout }) {
       if(result.status === 'success') {
         const rawKaryawan = safeArray(result.karyawan).map(k => {
             if (!k) return null;
-            // Penambahan opsi pembacaan id pegawai yang lebih luas
             const empId = getVal(k, ['id-pegawai', 'id pegawai', 'id karyawan', 'is karyawan', 'nik', 'id', 'no'], Math.random().toString(36).substr(2, 9));
             const empName = getVal(k, ['nama lengkap sesuai ktp', 'nama pegawai', 'nama', 'pegawai', 'name'], 'Unknown');
             return {
@@ -362,7 +371,6 @@ function AdminDashboard({ onLogout }) {
         const karyawanMap = new Map();
         rawKaryawan.forEach(k => { 
             if(k && k.id) {
-               // Normalisasi ID Karyawan
                karyawanMap.set(String(k.id).trim().toUpperCase(), k); 
             }
         });
@@ -372,19 +380,19 @@ function AdminDashboard({ onLogout }) {
         const normalizedCuti = safeArray(result.cuti).map(c => {
             if (!c) return null;
             const empName = getVal(c, ['nama pegawai', 'nama', 'name'], 'Unknown');
-            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: getVal(c, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), name: empName, type: getVal(c, ['jenis pengajuan', 'jenis', 'type'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: getVal(c, ['lampiran', 'foto', 'file'], '') };
+            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: getVal(c, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), name: empName, type: getVal(c, ['jenis pengajuan', 'jenis', 'type'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: getVal(c, ['lampiran', 'foto', 'file', 'photo', 'bukti'], '') };
         }).filter(Boolean);
 
         const normalizedLaporan = safeArray(result.laporan).map(l => {
             if (!l) return null;
             const empName = getVal(l, ['nama', 'nama pegawai', 'name'], 'Unknown');
-            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: getVal(l, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), nama: empName, waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), photo: getVal(l, ['lampiran', 'foto', 'file'], '') };
+            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: getVal(l, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), nama: empName, waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), photo: getVal(l, ['lampiran', 'foto', 'file', 'photo', 'bukti', 'image'], '') };
         }).filter(Boolean);
 
         const normalizedAbsensi = safeArray(result.absensi).map(a => {
             if (!a) return null;
             const empName = getVal(a, ['nama', 'nama pegawai', 'username', 'name'], 'Unknown');
-            return { ...a, userId: getVal(a, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), userName: empName, date: getVal(a, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action', 'keterangan'], '-'), photo: getVal(a, ['lampiran', 'foto', 'file', 'image'], '') };
+            return { ...a, userId: getVal(a, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), userName: empName, date: getVal(a, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action', 'keterangan'], '-'), photo: getVal(a, ['lampiran', 'foto', 'file', 'image', 'photo', 'bukti'], '') };
         }).filter(Boolean);
 
         setData({ karyawan: normalizedKaryawan, absensi: normalizedAbsensi, laporan: normalizedLaporan, pesan: safeArray(result.pesan), cuti: normalizedCuti, broadcast: safeArray(result.broadcast) });
@@ -394,7 +402,7 @@ function AdminDashboard({ onLogout }) {
 
   useEffect(() => { 
       fetchData(false); 
-      const autoSyncInterval = setInterval(() => fetchData(true), 1000); 
+      const autoSyncInterval = setInterval(() => fetchData(true), 2000); 
       return () => clearInterval(autoSyncInterval); 
   }, []);
 
@@ -423,7 +431,11 @@ function AdminDashboard({ onLogout }) {
          const id = c.id || `${String(c.userId).trim().toUpperCase()}-${c.reason}`;
          if(seen.has(id)) return false; seen.add(id); return true;
       }).map(c => {
-         const targetUid = String(c.userId).trim().toUpperCase();
+         let targetUid = String(c.userId).trim().toUpperCase();
+         const targetNameNorm = String(c.name).toLowerCase().replace(/[^a-z0-9]/g, '');
+         const matchedEmp = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid || String(emp.name).toLowerCase().replace(/[^a-z0-9]/g, '') === targetNameNorm);
+         if (matchedEmp) targetUid = String(matchedEmp.id).trim().toUpperCase();
+         
          const kInfo = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid) || {};
          return { ...c, role: kInfo.role || '-', penempatan: kInfo.penempatan || '-', name: kInfo.name || c.name };
       }).reverse();
@@ -433,7 +445,11 @@ function AdminDashboard({ onLogout }) {
   const validLaporan = useMemo(() => {
     try {
         return safeArray(data.laporan).map(l => {
-            const targetUid = String(l.userId).trim().toUpperCase();
+            let targetUid = String(l.userId).trim().toUpperCase();
+            const targetNameNorm = String(l.nama).toLowerCase().replace(/[^a-z0-9]/g, '');
+            const matchedEmp = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid || String(emp.name).toLowerCase().replace(/[^a-z0-9]/g, '') === targetNameNorm);
+            if (matchedEmp) targetUid = String(matchedEmp.id).trim().toUpperCase();
+
             const kInfo = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid) || {};
             return { ...l, role: kInfo.role || '-', penempatan: kInfo.penempatan || '-', nama: kInfo.name || l.nama };
         });
@@ -483,8 +499,20 @@ function AdminDashboard({ onLogout }) {
         else matchDate = String(a.date || '').toLowerCase() === String(targetDateStrForGroup || '').toLowerCase();
         if (!matchDate) return; 
 
-        // PENINGKATAN: Format ID agar pasti cocok
-        const uid = String(a.userId).trim().toUpperCase();
+        // PENINGKATAN: Cari ID dengan fallback Pencocokan Nama yang kuat untuk cegah Data Siluman
+        let uid = String(a.userId).trim().toUpperCase();
+        const aNameNorm = String(a.userName).toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        if (!groups[uid]) {
+           const matchedEmp = safeArray(data.karyawan).find(emp => 
+               String(emp.id).trim().toUpperCase() === uid || 
+               (aNameNorm !== '' && String(emp.name).toLowerCase().replace(/[^a-z0-9]/g, '') === aNameNorm)
+           );
+           if (matchedEmp) {
+               uid = String(matchedEmp.id).trim().toUpperCase(); // Koreksi ID yang salah/tidak sinkron
+           }
+        }
+        
         if (!groups[uid]) {
            const kInfo = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === uid) || {};
            groups[uid] = { 
@@ -494,6 +522,7 @@ function AdminDashboard({ onLogout }) {
         }
         
         groups[uid].hasRecord = true;
+        // Gunakan foto hasil absensi
         if (a.photo && String(a.photo).trim() !== '') { groups[uid].photo = a.photo; }
         
         const act = String(a.action || '').toLowerCase();
@@ -515,7 +544,6 @@ function AdminDashboard({ onLogout }) {
             groups[uid].patroli = a.time;
         }
         else {
-            // PENINGKATAN: Apapun actionnya selain pulang/istirahat, akan dideteksi sebagai HADIR (Masuk) jika ada datanya
             groups[uid].masuk = a.time !== '-' ? a.time : groups[uid].masuk; 
             let targetTime = '08:00'; const role = groups[uid].role;
             if (role === 'Umum') targetTime = appSettings?.Umum_Masuk || '08:00';
@@ -939,8 +967,8 @@ function DashboardDetailModal({ title, list, onClose, onPhoto, displayDateStr })
                     ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><FileText size={18} className="text-[#1a73e8]" /></div>
                     ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><Clock size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
-                    ) : g.photo && String(g.photo).trim() !== '' ? ( <div className="w-10 h-10 cursor-pointer" onClick={()=>onPhoto(g.photo)}><img src={g.photo} className="w-full h-full rounded object-cover border border-gray-200 hover:opacity-80 transition-opacity" alt="Bukti" /></div>
-                    ) : ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title={isBelumAbsen ? "Belum Absen" : "Tanpa Foto"}><UserCircle size={16} className="text-gray-400" /></div> )}
+                    ) : g.photo && String(g.photo).trim() !== '' ? ( <div className="w-10 h-10 cursor-pointer" onClick={()=>onPhoto(g.photo)}><img src={g.photo} className="w-full h-full rounded object-cover border border-gray-200 hover:opacity-80 transition-opacity" alt="Bukti Foto Absen" /></div>
+                    ) : ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title={isBelumAbsen ? "Belum Absen" : "Tanpa Foto Absen"}><UserCircle size={16} className="text-gray-400" /></div> )}
                   </td>
                   <td className="px-6 py-4"><p className={`font-medium ${isAlpha ? 'text-red-700' : 'text-gray-900'}`}>{String(g.userName || '-')}</p><p className="text-xs text-gray-500 mt-0.5">{String(g.role || '-')} • {String(g.penempatan || '-')}</p></td>
                   <td className="px-6 py-4"><span className={`inline-block px-2 py-1 rounded text-[10px] uppercase font-bold border whitespace-nowrap ${String(g.bgStyle)}`}>{String(g.statusText || '-')}</span></td>
@@ -997,7 +1025,7 @@ function AbsensiDetailedTable({ list, onPhoto, onDetail, karyawan, filterTanggal
                     ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><FileText size={18} className="text-[#1a73e8]" /></div>
                     ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><Clock size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
-                    ) : g.photo && String(g.photo).trim() !== '' ? ( <div className="w-10 h-10 cursor-pointer" onClick={()=>onPhoto(g.photo)}><img src={g.photo} className="w-full h-full rounded object-cover border border-gray-200 hover:opacity-80 transition-opacity" alt="Bukti Foto" /></div>
+                    ) : g.photo && String(g.photo).trim() !== '' ? ( <div className="w-10 h-10 cursor-pointer" onClick={()=>onPhoto(g.photo)}><img src={g.photo} className="w-full h-full rounded object-cover border border-gray-200 hover:opacity-80 transition-opacity" alt="Bukti Foto Absen" /></div>
                     ) : ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title={isBelumAbsen ? "Belum Absen" : "Tanpa Foto Absen"}><UserCircle size={16} className="text-gray-400" /></div> )}
                   </td>
                   <td className="px-6 py-4"><div><p className={`font-medium ${isAlpha ? 'text-red-700' : 'text-gray-900'}`}>{String(g.userName || '-')}</p><p className="text-xs text-gray-500 mt-0.5">{String(g.role || '-')}</p></div></td>
@@ -1038,8 +1066,7 @@ function KaryawanTable({ list, validCuti, onDetail, onAdd, onDelete, filterDivis
        if (type.includes('cuti') && !type.includes('melahirkan') && !status.includes('reject') && !status.includes('tolak')) {
            const { startDate, days } = hitungDurasiHari(c.start || c.tanggal || c.date);
            const uid = String(c.userId).trim().toUpperCase();
-           if (startDate && startDate.getFullYear() === currentYear) { 
-               if(!stats[uid]) stats[uid] = { taken: 0, sisa: 12 };
+           if (startDate && startDate.getFullYear() === currentYear && stats[uid]) { 
                stats[uid].taken += days; 
                stats[uid].sisa = 12 - stats[uid].taken; 
            }
