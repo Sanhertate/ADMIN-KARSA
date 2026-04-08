@@ -16,7 +16,7 @@ import {
 // ==========================================
 // KONEKSI DATABASE & KONFIGURASI
 // ==========================================
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwERT8qauFuVIET-kOfyn5LIHqyZd4Dil7uCONPFY9SYPWfi3RowtRrKA3iGmjiS4GZ/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzqdavtaSSAvPaHKxn0cHscXmBqzAoegk7eY2QDivjfkr4Fz5NNlebI79ZlPKrrft1s/exec";
 
 const APP_NAME = "Admin HRD";
 const COMPANY_NAME = "PT. Karsa Sentana Lumbung Sentosa";
