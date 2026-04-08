@@ -82,6 +82,16 @@ const formatToInputDate = (dateStr) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const formatDriveUrl = (url) => {
+    if (!url || typeof url !== 'string') return '';
+    // Konversi Google Drive URL ke direct image link agar tidak kena blokir browser (CORS)
+    const match = url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (url.includes('drive.google.com') && match) {
+        return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return url;
+};
+
 const hitungDurasiHari = (dateStr) => {
     if (!dateStr || dateStr === '-') return { startDate: null, days: 0 };
     const str = String(dateStr).toLowerCase();
@@ -137,10 +147,8 @@ const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr
   const allDates = new Set();
   
   const targetUid = String(personel?.id || personel?.userId || '').trim().toUpperCase();
-  // PENINGKATAN: Hilangkan spasi untuk pencocokan nama
   const targetNameNorm = String(personel?.name || personel?.userName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // PENINGKATAN: Cari absen berdasarkan ID ATAU Nama untuk cegah data siluman
   const karAbsen = safeArray(allAbsensi).filter(a => {
       if (!a) return false;
       const aUid = String(a.userId || '').trim().toUpperCase();
@@ -256,19 +264,38 @@ const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr
   };
 };
 
+// ==========================================
+// ERROR BOUNDARY COMPONENT
+// ==========================================
 class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, errorMessage: '' }; }
-  static getDerivedStateFromError(error) { return { hasError: true, errorMessage: error.toString() }; }
-  componentDidCatch(error, errorInfo) { console.error("Terjadi Kesalahan Sistem:", error, errorInfo); }
+  constructor(props) { 
+    super(props); 
+    this.state = { hasError: false, errorMessage: '' }; 
+  }
+  
+  static getDerivedStateFromError(error) { 
+    return { hasError: true, errorMessage: error.toString() }; 
+  }
+  
+  componentDidCatch(error, errorInfo) { 
+    console.error("Terjadi Kesalahan Sistem:", error, errorInfo); 
+  }
+  
   render() {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center p-8 text-center font-sans">
           <div className="bg-white rounded-xl p-10 max-w-md w-full shadow-lg border border-gray-200">
-             <div className="flex justify-center mb-6"><AlertCircle size={48} className="text-red-500" /></div>
+             <div className="flex justify-center mb-6">
+                <AlertCircle size={48} className="text-red-500" />
+             </div>
              <h1 className="text-xl font-medium text-gray-900 mb-2">Terjadi Kesalahan Visual</h1>
-             <p className="text-sm text-gray-600 mb-8">Sistem mendeteksi struktur data yang butuh penyegaran.</p>
-             <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-medium py-2.5 rounded-md transition-colors text-sm">Muat Ulang Aplikasi</button>
+             <p className="text-sm text-gray-600 mb-8">Sistem mendeteksi struktur data yang butuh penyegaran atau tidak sinkron.</p>
+             <button 
+                onClick={() => { localStorage.clear(); window.location.reload(); }} 
+                className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-medium py-2.5 rounded-md transition-colors text-sm">
+                Muat Ulang Aplikasi
+             </button>
              <p className="text-[9px] text-gray-400 mt-6 font-mono break-all">{this.state.errorMessage}</p>
           </div>
         </div>
@@ -278,9 +305,16 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// ==========================================
+// MAIN APP COMPONENT
+// ==========================================
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  return <ErrorBoundary>{!isAuthenticated ? <AdminLogin onLogin={() => setIsAuthenticated(true)} /> : <AdminDashboard onLogout={() => setIsAuthenticated(false)} />}</ErrorBoundary>;
+  return (
+    <ErrorBoundary>
+      {!isAuthenticated ? <AdminLogin onLogin={() => setIsAuthenticated(true)} /> : <AdminDashboard onLogout={() => setIsAuthenticated(false)} />}
+    </ErrorBoundary>
+  );
 }
 
 function AdminLogin({ onLogin }) {
@@ -358,7 +392,7 @@ function AdminDashboard({ onLogout }) {
                 ...k, id: empId, name: empName,
                 role: getVal(k, ['organisasi', 'divisi', 'role'], '-'), penempatan: getVal(k, ['jabatan', 'pekerjaan', 'posisi', 'penempatan'], '-'),
                 pekerjaan: getVal(k, ['pekerjaan spesifik', 'pekerjaan', 'spesifik'], '-'),
-                phone: getVal(k, ['nomor hp', 'nomor ponsel', 'no hp', 'phone'], ''), password: getVal(k, ['kata sandi', 'sandi', 'password'], '123456'), photo: getVal(k, ['foto', 'photo'], ''),
+                phone: getVal(k, ['nomor hp', 'nomor ponsel', 'no hp', 'phone'], ''), password: getVal(k, ['kata sandi', 'sandi', 'password'], '123456'), photo: formatDriveUrl(getVal(k, ['foto', 'photo', 'profile', 'profil'], '')),
                 tempatLahir: getVal(k, ['tempat lahir', 'tempatlahir']), tanggalLahir: getVal(k, ['tanggal lahir', 'dob', 'tanggallahir']), jenisKelamin: getVal(k, ['jenis kelamin', 'gender']),
                 statusKawin: getVal(k, ['status perkawinan', 'statuskawin']), golDarah: getVal(k, ['golongan darah', 'goldarah']), agama: getVal(k, ['agama', 'religion']),
                 noKtp: getVal(k, ['nik ktp', 'no ktp', 'noktp', 'id ktp', 'id kartu identitas', 'ktp']), noKk: getVal(k, ['id kartu keluarga', 'nomor kartu keluarga', 'kk']), email: getVal(k, ['email']),
@@ -380,29 +414,29 @@ function AdminDashboard({ onLogout }) {
         const normalizedCuti = safeArray(result.cuti).map(c => {
             if (!c) return null;
             const empName = getVal(c, ['nama pegawai', 'nama', 'name'], 'Unknown');
-            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: getVal(c, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), name: empName, type: getVal(c, ['jenis pengajuan', 'jenis', 'type'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: getVal(c, ['lampiran', 'foto', 'file', 'photo', 'bukti'], '') };
+            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: getVal(c, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), name: empName, type: getVal(c, ['jenis pengajuan', 'jenis', 'type'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: formatDriveUrl(getVal(c, ['lampiran', 'foto', 'file', 'photo', 'bukti'], '')) };
         }).filter(Boolean);
 
         const normalizedLaporan = safeArray(result.laporan).map(l => {
             if (!l) return null;
             const empName = getVal(l, ['nama', 'nama pegawai', 'name'], 'Unknown');
-            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: getVal(l, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), nama: empName, waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), photo: getVal(l, ['lampiran', 'foto', 'file', 'photo', 'bukti', 'image'], '') };
+            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: getVal(l, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), nama: empName, waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), photo: formatDriveUrl(getVal(l, ['lampiran', 'foto', 'file', 'photo', 'bukti', 'image'], '')) };
         }).filter(Boolean);
 
         const normalizedAbsensi = safeArray(result.absensi).map(a => {
             if (!a) return null;
             const empName = getVal(a, ['nama', 'nama pegawai', 'username', 'name'], 'Unknown');
-            return { ...a, userId: getVal(a, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), userName: empName, date: getVal(a, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action', 'keterangan'], '-'), photo: getVal(a, ['lampiran', 'foto', 'file', 'image', 'photo', 'bukti'], '') };
+            return { ...a, userId: getVal(a, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), userName: empName, date: getVal(a, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action', 'keterangan'], '-'), photo: formatDriveUrl(getVal(a, ['lampiran', 'foto', 'file', 'image', 'photo', 'bukti', 'foto absen', 'bukti absen'], '')) };
         }).filter(Boolean);
 
         setData({ karyawan: normalizedKaryawan, absensi: normalizedAbsensi, laporan: normalizedLaporan, pesan: safeArray(result.pesan), cuti: normalizedCuti, broadcast: safeArray(result.broadcast) });
       }
-    } catch (e) { } finally { if (!isSilent) setIsSyncing(false); isFetchingRef.current = false; }
+    } catch (e) { console.error(e); } finally { if (!isSilent) setIsSyncing(false); isFetchingRef.current = false; }
   };
 
   useEffect(() => { 
       fetchData(false); 
-      const autoSyncInterval = setInterval(() => fetchData(true), 2000); 
+      const autoSyncInterval = setInterval(() => fetchData(true), 5000); 
       return () => clearInterval(autoSyncInterval); 
   }, []);
 
@@ -523,7 +557,10 @@ function AdminDashboard({ onLogout }) {
         
         groups[uid].hasRecord = true;
         // Gunakan foto hasil absensi
-        if (a.photo && String(a.photo).trim() !== '') { groups[uid].photo = a.photo; }
+        const photoVal = String(a.photo || '').trim();
+        if (photoVal && photoVal !== '-' && photoVal.toLowerCase() !== 'undefined' && photoVal.toLowerCase() !== 'null') {
+            groups[uid].photo = photoVal;
+        }
         
         const act = String(a.action || '').toLowerCase();
         
