@@ -84,7 +84,6 @@ const formatToInputDate = (dateStr) => {
 
 const formatDriveUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
-    // Konversi Google Drive URL ke direct image link agar tidak kena blokir browser (CORS)
     const match = url.match(/id=([a-zA-Z0-9_-]+)/);
     if (url.includes('drive.google.com') && match) {
         return `https://lh3.googleusercontent.com/d/${match[1]}`;
@@ -264,9 +263,6 @@ const getKaryawanStats = (personel, allAbsensi, validCuti, appSettings, bulanStr
   };
 };
 
-// ==========================================
-// ERROR BOUNDARY COMPONENT
-// ==========================================
 class ErrorBoundary extends React.Component {
   constructor(props) { 
     super(props); 
@@ -305,9 +301,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// ==========================================
-// MAIN APP COMPONENT
-// ==========================================
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   return (
@@ -339,10 +332,13 @@ function AdminLogin({ onLogin }) {
 }
 
 function AdminDashboard({ onLogout }) {
-  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [activeMenu, setActiveMenu] = useState('karyawan'); // Set default to Karyawan for easier checking
   const [isSyncing, setIsSyncing] = useState(false);
+  const [fetchError, setFetchError] = useState(null); // STATE BARU UNTUK MENAMPUNG ERROR SERVER
   const [notif, setNotif] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Mengatur agar sidebar default terbuka (karena tombol disembunyikan)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   const localPesanStatus = useRef(getInitialLocalCache('hrd_admin_pesan_status'));
@@ -375,30 +371,81 @@ function AdminDashboard({ onLogout }) {
   const isFetchingRef = useRef(false);
   const pauseSyncUntil = useRef(0);
 
+  // ==========================================
+  // PERBAIKAN LOGIKA FETCH DATA 
+  // ==========================================
   const fetchData = async (isSilent = false) => {
     if (Date.now() < pauseSyncUntil.current || isFetchingRef.current) return;
-    isFetchingRef.current = true; if (!isSilent) setIsSyncing(true);
+    isFetchingRef.current = true; 
+    if (!isSilent) setIsSyncing(true);
+    
     try {
       const fallbackDateStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-      const response = await fetch(`${GOOGLE_SHEETS_API_URL}?t=${new Date().getTime()}`);
-      const result = await response.json();
       
-      if(result.status === 'success') {
-        const rawKaryawan = safeArray(result.karyawan).map(k => {
-            if (!k) return null;
-            const empId = getVal(k, ['id-pegawai', 'id pegawai', 'id karyawan', 'is karyawan', 'nik', 'id', 'no'], Math.random().toString(36).substr(2, 9));
-            const empName = getVal(k, ['nama lengkap sesuai ktp', 'nama pegawai', 'nama', 'pegawai', 'name'], 'Unknown');
+      const response = await fetch(`${GOOGLE_SHEETS_API_URL}?action=read&t=${new Date().getTime()}`);
+      if (!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
+      
+      const textResponse = await response.text();
+      let result;
+      
+      // Mencegah error crash kalau Google Apps Script mengembalikan HTML (Minta Login/Izin)
+      try {
+          result = JSON.parse(textResponse);
+      } catch (err) {
+          console.error("Format data dari server bukan JSON:", textResponse.substring(0, 100));
+          throw new Error("Server mengembalikan format HTML. Pastikan Google Apps Script di-deploy dengan akses 'Anyone'.");
+      }
+      
+      // Mendukung variasi format array (result langsung array, result.data, atau result.karyawan)
+      const rawKaryawanList = result.karyawan || result.data?.karyawan || (Array.isArray(result) ? result : []);
+      const rawAbsensiList = result.absensi || result.data?.absensi || [];
+      const rawLaporanList = result.laporan || result.data?.laporan || [];
+      const rawPesanList = result.pesan || result.data?.pesan || [];
+      const rawCutiList = result.cuti || result.data?.cuti || [];
+      const rawBroadcastList = result.broadcast || result.data?.broadcast || [];
+
+      if(result.status === 'success' || rawKaryawanList.length > 0) {
+        setFetchError(null); // Reset error jika sukses
+
+        const rawKaryawan = safeArray(rawKaryawanList).map(k => {
+            if (!k || typeof k !== 'object') return null;
+            
+            // Tambahan possible keys yang sangat luas untuk mencegah data tak terbaca
+            const empIdRaw = String(getVal(k, ['id-pegawai', 'id pegawai', 'id karyawan', 'is karyawan', 'nik', 'nomor induk', 'id', 'no', 'userid'], '')).trim();
+            const empNameRaw = String(getVal(k, ['nama lengkap sesuai ktp', 'nama pegawai', 'nama lengkap', 'nama karyawan', 'nama', 'pegawai', 'name'], '')).trim();
+            
+            // 🔥 PEMUSNAH UNKNOWN: Jika nama kosong, kita skip. Tapi kalau ID kosong namun NAMA ada, kita amankan!
+            if (!empNameRaw || empNameRaw.toLowerCase() === 'unknown') return null;
+            const finalId = empIdRaw || `TEMP-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
             return {
-                ...k, id: empId, name: empName,
-                role: getVal(k, ['organisasi', 'divisi', 'role'], '-'), penempatan: getVal(k, ['jabatan', 'pekerjaan', 'posisi', 'penempatan'], '-'),
-                pekerjaan: getVal(k, ['pekerjaan spesifik', 'pekerjaan', 'spesifik'], '-'),
-                phone: getVal(k, ['nomor hp', 'nomor ponsel', 'no hp', 'phone'], ''), password: getVal(k, ['kata sandi', 'sandi', 'password'], '123456'), photo: formatDriveUrl(getVal(k, ['foto', 'photo', 'profile', 'profil'], '')),
-                tempatLahir: getVal(k, ['tempat lahir', 'tempatlahir']), tanggalLahir: getVal(k, ['tanggal lahir', 'dob', 'tanggallahir']), jenisKelamin: getVal(k, ['jenis kelamin', 'gender']),
-                statusKawin: getVal(k, ['status perkawinan', 'statuskawin']), golDarah: getVal(k, ['golongan darah', 'goldarah']), agama: getVal(k, ['agama', 'religion']),
-                noKtp: getVal(k, ['nik ktp', 'no ktp', 'noktp', 'id ktp', 'id kartu identitas', 'ktp']), noKk: getVal(k, ['id kartu keluarga', 'nomor kartu keluarga', 'kk']), email: getVal(k, ['email']),
-                alamat: getVal(k, ['alamat', 'addressdetail']), provinsi: getVal(k, ['provinsi']), kota: getVal(k, ['kota', 'kabupaten']), pendidikan: getVal(k, ['jenjang pendidikan terakhir', 'pendidikan', 'education'], '-'),
-                prodi: getVal(k, ['program studi', 'prodi']), tglGabung: getVal(k, ['awal bergabung', 'tanggal bergabung', 'tglgabung', 'tanggal mulai bekerja']), tglBerakhir: getVal(k, ['akhir bergabung', 'tanggal berakhir']),
-                hariKerja: getVal(k, ['hari kerja', 'hk'], '-'), gaji: getVal(k, ['gaji', 'gapok'])
+                ...k, 
+                id: finalId, 
+                name: empNameRaw,
+                role: getVal(k, ['organisasi', 'divisi', 'role', 'jabatan utama', 'departemen'], '-'), 
+                penempatan: getVal(k, ['jabatan', 'pekerjaan', 'posisi', 'penempatan', 'lokasi', 'tempat tugas'], '-'),
+                pekerjaan: getVal(k, ['pekerjaan spesifik', 'pekerjaan', 'spesifik', 'jobdesk'], '-'),
+                phone: getVal(k, ['nomor hp', 'nomor ponsel', 'no hp', 'phone', 'whatsapp'], ''), 
+                password: getVal(k, ['kata sandi', 'sandi', 'password', 'pin'], '123456'), 
+                photo: formatDriveUrl(getVal(k, ['foto', 'photo', 'profile', 'profil', 'avatar'], '')),
+                tempatLahir: getVal(k, ['tempat lahir', 'tempatlahir']), 
+                tanggalLahir: getVal(k, ['tanggal lahir', 'dob', 'tanggallahir']), 
+                jenisKelamin: getVal(k, ['jenis kelamin', 'gender', 'kelamin']),
+                statusKawin: getVal(k, ['status perkawinan', 'statuskawin', 'perkawinan']), 
+                golDarah: getVal(k, ['golongan darah', 'goldarah']), 
+                agama: getVal(k, ['agama', 'religion']),
+                noKtp: getVal(k, ['nik ktp', 'no ktp', 'noktp', 'id ktp', 'id kartu identitas', 'ktp']), 
+                noKk: getVal(k, ['id kartu keluarga', 'nomor kartu keluarga', 'kk', 'nokk']), 
+                email: getVal(k, ['email', 'surel']),
+                alamat: getVal(k, ['alamat', 'addressdetail', 'alamat lengkap']), 
+                provinsi: getVal(k, ['provinsi']), 
+                kota: getVal(k, ['kota', 'kabupaten']), 
+                pendidikan: getVal(k, ['jenjang pendidikan terakhir', 'pendidikan', 'education'], '-'),
+                prodi: getVal(k, ['program studi', 'prodi', 'jurusan']), 
+                tglGabung: getVal(k, ['awal bergabung', 'tanggal bergabung', 'tglgabung', 'tanggal mulai bekerja', 'mulai kerja']), 
+                tglBerakhir: getVal(k, ['akhir bergabung', 'tanggal berakhir', 'kontrak habis']),
+                hariKerja: getVal(k, ['hari kerja', 'hk'], '-'), 
+                gaji: getVal(k, ['gaji', 'gapok', 'upah'])
             };
         }).filter(Boolean);
 
@@ -411,27 +458,52 @@ function AdminDashboard({ onLogout }) {
         
         const normalizedKaryawan = Array.from(karyawanMap.values()).filter(k => !deletedKaryawanIds.current.has(String(k.id).trim()));
 
-        const normalizedCuti = safeArray(result.cuti).map(c => {
+        const normalizedCuti = safeArray(rawCutiList).map(c => {
             if (!c) return null;
-            const empName = getVal(c, ['nama pegawai', 'nama', 'name'], 'Unknown');
-            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: getVal(c, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), name: empName, type: getVal(c, ['jenis pengajuan', 'jenis', 'type'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: formatDriveUrl(getVal(c, ['lampiran', 'foto', 'file', 'photo', 'bukti'], '')) };
+            const empName = String(getVal(c, ['nama pegawai', 'nama', 'name'], '')).trim();
+            const empId = String(getVal(c, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], '')).trim();
+            if (!empId && !empName) return null; 
+            
+            return { ...c, id: c.id || Math.random().toString(36).substr(2, 9), userId: empId || empName, name: empName || 'Unknown', type: getVal(c, ['jenis pengajuan', 'jenis', 'type', 'kategori'], 'Cuti/Izin'), reason: getVal(c, ['alasan', 'keterangan', 'pesan', 'reason'], '-'), start: getVal(c, ['tanggal mulai', 'tanggal', 'start', 'date'], fallbackDateStr), status: getVal(c, ['status', 'Status', 'Setatus'], 'Pending'), file: formatDriveUrl(getVal(c, ['lampiran', 'foto', 'file', 'photo', 'bukti'], '')) };
         }).filter(Boolean);
 
-        const normalizedLaporan = safeArray(result.laporan).map(l => {
+        const normalizedLaporan = safeArray(rawLaporanList).map(l => {
             if (!l) return null;
-            const empName = getVal(l, ['nama', 'nama pegawai', 'name'], 'Unknown');
-            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: getVal(l, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), nama: empName, waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), photo: formatDriveUrl(getVal(l, ['lampiran', 'foto', 'file', 'photo', 'bukti', 'image'], '')) };
+            const empName = String(getVal(l, ['nama', 'nama pegawai', 'name'], '')).trim();
+            const empId = String(getVal(l, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], '')).trim();
+            if (!empId && !empName) return null; 
+            
+            let targetUid = empId.toUpperCase();
+            const targetNameNorm = empName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const matchedEmp = safeArray(normalizedKaryawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid || String(emp.name).toLowerCase().replace(/[^a-z0-9]/g, '') === targetNameNorm);
+            if (matchedEmp) targetUid = String(matchedEmp.id).trim().toUpperCase();
+
+            const kInfo = safeArray(normalizedKaryawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid) || {};
+            return { ...l, id: l.id || Math.random().toString(36).substr(2, 9), userId: targetUid, nama: kInfo.name || empName || 'Unknown', waktu: getVal(l, ['waktu', 'jam', 'time'], '-'), teks: getVal(l, ['isi laporan', 'deskripsi pekerjaan', 'keterangan', 'teks'], '-'), tanggal: getVal(l, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), photo: formatDriveUrl(getVal(l, ['lampiran', 'foto', 'file', 'photo', 'bukti', 'image'], '')) };
         }).filter(Boolean);
 
-        const normalizedAbsensi = safeArray(result.absensi).map(a => {
+        const normalizedAbsensi = safeArray(rawAbsensiList).map(a => {
             if (!a) return null;
-            const empName = getVal(a, ['nama', 'nama pegawai', 'username', 'name'], 'Unknown');
-            return { ...a, userId: getVal(a, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], empName), userName: empName, date: getVal(a, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action', 'keterangan'], '-'), photo: formatDriveUrl(getVal(a, ['lampiran', 'foto', 'file', 'image', 'photo', 'bukti', 'foto absen', 'bukti absen'], '')) };
+            const empName = String(getVal(a, ['nama', 'nama pegawai', 'username', 'name'], '')).trim();
+            const empId = String(getVal(a, ['id-pegawai', 'id pegawai', 'id karyawan', 'nik', 'userid', 'id'], '')).trim();
+            if (!empId && !empName) return null; 
+            
+            return { ...a, userId: empId || empName, userName: empName || 'Unknown', date: getVal(a, ['tanggal', 'date', 'waktu absen', 'timestamp'], fallbackDateStr), time: getVal(a, ['waktu', 'jam', 'time'], '-'), action: getVal(a, ['aksi', 'status', 'action', 'keterangan'], '-'), photo: formatDriveUrl(getVal(a, ['lampiran', 'foto', 'file', 'image', 'photo', 'bukti', 'foto absen', 'bukti absen'], '')) };
         }).filter(Boolean);
 
-        setData({ karyawan: normalizedKaryawan, absensi: normalizedAbsensi, laporan: normalizedLaporan, pesan: safeArray(result.pesan), cuti: normalizedCuti, broadcast: safeArray(result.broadcast) });
+        setData({ karyawan: normalizedKaryawan, absensi: normalizedAbsensi, laporan: normalizedLaporan, pesan: safeArray(rawPesanList), cuti: normalizedCuti, broadcast: safeArray(rawBroadcastList) });
+      } else {
+        throw new Error(result.message || "Data kosong atau struktur API tidak sesuai dengan format yang didukung.");
       }
-    } catch (e) { console.error(e); } finally { if (!isSilent) setIsSyncing(false); isFetchingRef.current = false; }
+    } catch (e) { 
+      console.error("Gagal Mengambil Data:", e); 
+      if (!isSilent) {
+          setFetchError(e.message);
+      }
+    } finally { 
+      if (!isSilent) setIsSyncing(false); 
+      isFetchingRef.current = false; 
+    }
   };
 
   useEffect(() => { 
@@ -442,6 +514,7 @@ function AdminDashboard({ onLogout }) {
 
   const uniquePlacements = useMemo(() => { try { return [...new Set(safeArray(data.karyawan).map(k => k?.penempatan ? String(k.penempatan) : null).filter(Boolean))]; } catch(e) { return []; } }, [data.karyawan]);
   const validBroadcast = useMemo(() => { try { return safeArray(data.broadcast).filter(b => b?.message && String(b.message).trim() !== ''); } catch(e) { return []; } }, [data.broadcast]);
+  const validLaporan = useMemo(() => { return safeArray(data.laporan); }, [data.laporan]);
   const validPesan = useMemo(() => {
     try { 
       return safeArray(data.pesan).filter(p => p && (p.pesan || p.teks || p.text)).map(p => { const local = localPesanStatus.current[p.id]; return local ? { ...p, status: local.status, balasan: local.balasan } : p; }).reverse(); 
@@ -476,20 +549,6 @@ function AdminDashboard({ onLogout }) {
     } catch(e) { return []; }
   }, [data.cuti, data.pesan, data.karyawan, todayStrReal]);
   
-  const validLaporan = useMemo(() => {
-    try {
-        return safeArray(data.laporan).map(l => {
-            let targetUid = String(l.userId).trim().toUpperCase();
-            const targetNameNorm = String(l.nama).toLowerCase().replace(/[^a-z0-9]/g, '');
-            const matchedEmp = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid || String(emp.name).toLowerCase().replace(/[^a-z0-9]/g, '') === targetNameNorm);
-            if (matchedEmp) targetUid = String(matchedEmp.id).trim().toUpperCase();
-
-            const kInfo = safeArray(data.karyawan).find(emp => String(emp.id).trim().toUpperCase() === targetUid) || {};
-            return { ...l, role: kInfo.role || '-', penempatan: kInfo.penempatan || '-', nama: kInfo.name || l.nama };
-        });
-    } catch(e) { return []; }
-  }, [data.laporan, data.karyawan]);
-
   const targetDateObj = useMemo(() => {
      if(!filterTanggal) return null;
      try { const [y, m, d] = String(filterTanggal).split('-'); const date = new Date(y, m - 1, d); return isNaN(date.getTime()) ? null : date; } catch(e) { return null; }
@@ -533,7 +592,6 @@ function AdminDashboard({ onLogout }) {
         else matchDate = String(a.date || '').toLowerCase() === String(targetDateStrForGroup || '').toLowerCase();
         if (!matchDate) return; 
 
-        // PENINGKATAN: Cari ID dengan fallback Pencocokan Nama yang kuat untuk cegah Data Siluman
         let uid = String(a.userId).trim().toUpperCase();
         const aNameNorm = String(a.userName).toLowerCase().replace(/[^a-z0-9]/g, '');
         
@@ -543,7 +601,7 @@ function AdminDashboard({ onLogout }) {
                (aNameNorm !== '' && String(emp.name).toLowerCase().replace(/[^a-z0-9]/g, '') === aNameNorm)
            );
            if (matchedEmp) {
-               uid = String(matchedEmp.id).trim().toUpperCase(); // Koreksi ID yang salah/tidak sinkron
+               uid = String(matchedEmp.id).trim().toUpperCase(); 
            }
         }
         
@@ -556,9 +614,9 @@ function AdminDashboard({ onLogout }) {
         }
         
         groups[uid].hasRecord = true;
-        // Gunakan foto hasil absensi
+        
         const photoVal = String(a.photo || '').trim();
-        if (photoVal && photoVal !== '-' && photoVal.toLowerCase() !== 'undefined' && photoVal.toLowerCase() !== 'null') {
+        if (photoVal && photoVal !== '-' && photoVal.toLowerCase() !== 'undefined' && photoVal.toLowerCase() !== 'null' && !photoVal.includes('ERROR_')) {
             groups[uid].photo = photoVal;
         }
         
@@ -774,7 +832,21 @@ function AdminDashboard({ onLogout }) {
       
       {selectedPhoto && (
         <div className="fixed inset-0 bg-gray-900/80 z-[2000] flex flex-col items-center justify-center p-10 animate-in fade-in">
-           <div className="bg-white p-2 rounded-lg shadow-xl relative"><button onClick={() => setSelectedPhoto(null)} className="absolute -top-3 -right-3 bg-white text-gray-500 hover:text-gray-800 rounded-full p-1 shadow-md"><X size={20} /></button><img src={selectedPhoto} className="max-w-[80vw] max-h-[80vh] rounded object-contain" alt="Bukti"/></div>
+           <div className="bg-white p-2 rounded-lg shadow-xl relative">
+              <button onClick={() => setSelectedPhoto(null)} className="absolute -top-3 -right-3 bg-white text-gray-500 hover:text-gray-800 rounded-full p-1 shadow-md"><X size={20} /></button>
+              <img 
+                 src={selectedPhoto} 
+                 className="max-w-[80vw] max-h-[80vh] rounded object-contain" 
+                 alt="Bukti Absen"
+                 onError={(e) => {
+                     if (!e.target.dataset.retried && selectedPhoto.includes('lh3.googleusercontent.com')) {
+                         e.target.dataset.retried = 'true';
+                         const match = selectedPhoto.match(/d\/([a-zA-Z0-9_-]+)/);
+                         if (match) e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+                     }
+                 }}
+              />
+           </div>
         </div>
       )}
 
@@ -796,7 +868,14 @@ function AdminDashboard({ onLogout }) {
 
       <main className="flex-1 flex flex-col min-w-0 bg-[#f8f9fa] overflow-hidden relative">
         <header className="bg-white h-16 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-10">
-          <div className="flex items-center gap-4"><button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"><Menu size={20} /></button><h2 className="font-normal text-xl text-gray-800 capitalize">{activeMenu.replace('-', ' ')}</h2></div>
+          <div className="flex items-center gap-4">
+              {/* Tombol menu (kiri) telah dihilangkan seperti yang diminta */}
+              <h2 className="font-normal text-xl text-gray-800 capitalize">{activeMenu.replace('-', ' ')}</h2>
+              
+              {/* INDIKATOR STATUS SINKRONISASI */}
+              {isSyncing && <div className="hidden sm:flex items-center gap-2 text-xs text-[#1a73e8] font-medium bg-blue-50 px-3 py-1 rounded-full"><RefreshCcw size={14} className="animate-spin" /> Menyinkronkan...</div>}
+              {fetchError && !isSyncing && <div className="hidden sm:flex items-center gap-2 text-xs text-red-600 font-medium bg-red-50 px-3 py-1 rounded-full border border-red-100" title={fetchError}><AlertTriangle size={14} /> Gagal Terhubung</div>}
+          </div>
           <div className="flex items-center gap-4 flex-1 justify-end px-4">
             <div className="relative max-w-md w-full ml-4"><Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" /><input type="text" placeholder="Telusuri ID-PEGAWAI atau Nama..." className="w-full pl-10 pr-4 py-2 bg-[#f1f3f4] border border-transparent rounded-md text-sm text-gray-700 focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-[#1a73e8] outline-none transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
             <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
@@ -810,7 +889,10 @@ function AdminDashboard({ onLogout }) {
           <div className="max-w-[1400px] mx-auto">
              {activeMenu === 'dashboard' && (<DashboardOverview data={data} groupedAbsensi={groupedAbsensi} filterTanggal={filterTanggal} setFilterTanggal={setFilterTanggal} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} uniquePlacements={uniquePlacements} onOpenCategoryModal={(title, list) => setDashboardModalData({title, list})} />)}
              {activeMenu === 'absensi' && (<AbsensiDetailedTable list={groupedAbsensi} onPhoto={setSelectedPhoto} onDetail={setSelectedLogPersonel} karyawan={data.karyawan} filterTanggal={filterTanggal} setFilterTanggal={setFilterTanggal} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} uniquePlacements={uniquePlacements} onExport={handleExportAbsensi} />)}
-             {activeMenu === 'karyawan' && (<KaryawanTable list={data.karyawan} validCuti={validCuti} onDetail={setSelectedProfilPersonel} onAdd={() => setIsAddKaryawanOpen(true)} onDelete={handleDeleteKaryawan} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} searchTerm={searchTerm} uniquePlacements={uniquePlacements} />)}
+             
+             {/* KARYAWAN TABLE DENGAN PENANGANAN ERROR */}
+             {activeMenu === 'karyawan' && (<KaryawanTable list={data.karyawan} validCuti={validCuti} onDetail={setSelectedProfilPersonel} onAdd={() => setIsAddKaryawanOpen(true)} onDelete={handleDeleteKaryawan} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} searchTerm={searchTerm} uniquePlacements={uniquePlacements} fetchError={fetchError} />)}
+             
              {activeMenu === 'cuti' && (<CutiTicketView list={validCuti} karyawan={data.karyawan} onPhoto={setSelectedPhoto} filterTanggal={filterTanggal} setFilterTanggal={setFilterTanggal} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} uniquePlacements={uniquePlacements} targetDateStr={targetDateStr} onExport={() => {
                      const currentYear = new Date().getFullYear(); const exportRows = []; const cutiStats = {};
                      safeArray(data.karyawan).forEach(k => { if(k && k.id) cutiStats[String(k.id).trim().toUpperCase()] = { taken: 0, sisa: 12 }; });
@@ -828,9 +910,9 @@ function AdminDashboard({ onLogout }) {
              )}
              {activeMenu === 'laporan' && (<LaporanView list={validLaporan} onPhoto={setSelectedPhoto} filterTanggal={filterTanggal} setFilterTanggal={setFilterTanggal} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} uniquePlacements={uniquePlacements} targetDateStr={targetDateStr} onOpenBelumLapor={() => setIsBelumLaporOpen(true)} onExport={handleExportLaporan} />)}
              {activeMenu === 'statistik' && (<StatistikKaryawanView list={data.karyawan} absensi={data.absensi} validCuti={validCuti} appSettings={appSettings} onSelect={setSelectedStatPersonel} filterDivisi={filterDivisi} setFilterDivisi={setFilterDivisi} filterPenempatan={filterPenempatan} setFilterPenempatan={setFilterPenempatan} searchTerm={searchTerm} uniquePlacements={uniquePlacements} onExportAll={(bulanStr) => {
-                    const exportRows = [];
-                    safeArray(data.karyawan).forEach(kar => { const { rawStats } = getKaryawanStats(kar, data.absensi, validCuti, appSettings, bulanStr); exportRows.push({ 'Nama Pegawai': kar.name, 'Divisi': kar.role, 'Tempat Kerja (Penempatan)': kar.penempatan, 'Total Hadir (Tepat Waktu)': Math.max(0, rawStats.tHadir - rawStats.tTelat), 'Total Terlambat': rawStats.tTelat, 'Total Izin': rawStats.tIzin, 'Total Sakit': rawStats.tCuti, 'Total Cuti': rawStats.tCuti, 'Total Libur / Off': rawStats.tLibur, 'Total Tanpa Keterangan (Alpha)': rawStats.tAlpha }); });
-                    exportDataToExcel(exportRows, `REKAPITULASI KESELURUHAN - BULAN ${bulanStr.toUpperCase()}`, 'Rekap_Statistik_Global', '');
+                     const exportRows = [];
+                     safeArray(data.karyawan).forEach(kar => { const { rawStats } = getKaryawanStats(kar, data.absensi, validCuti, appSettings, bulanStr); exportRows.push({ 'Nama Pegawai': kar.name, 'Divisi': kar.role, 'Tempat Kerja (Penempatan)': kar.penempatan, 'Total Hadir (Tepat Waktu)': Math.max(0, rawStats.tHadir - rawStats.tTelat), 'Total Terlambat': rawStats.tTelat, 'Total Izin': rawStats.tIzin, 'Total Sakit': rawStats.tCuti, 'Total Cuti': rawStats.tCuti, 'Total Libur / Off': rawStats.tLibur, 'Total Tanpa Keterangan (Alpha)': rawStats.tAlpha }); });
+                     exportDataToExcel(exportRows, `REKAPITULASI KESELURUHAN - BULAN ${bulanStr.toUpperCase()}`, 'Rekap_Statistik_Global', '');
                  }}
                />
              )}
@@ -1004,7 +1086,23 @@ function DashboardDetailModal({ title, list, onClose, onPhoto, displayDateStr })
                     ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><FileText size={18} className="text-[#1a73e8]" /></div>
                     ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><Clock size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
-                    ) : g.photo && String(g.photo).trim() !== '' ? ( <div className="w-10 h-10 cursor-pointer" onClick={()=>onPhoto(g.photo)}><img src={g.photo} className="w-full h-full rounded object-cover border border-gray-200 hover:opacity-80 transition-opacity" alt="Bukti Foto Absen" /></div>
+                    ) : g.photo && String(g.photo).trim() !== '' ? ( 
+                       <div className="w-10 h-10 cursor-pointer overflow-hidden rounded border border-gray-200" onClick={()=>onPhoto(g.photo)}>
+                           <img 
+                              src={g.photo} 
+                              className="w-full h-full object-cover hover:opacity-80 transition-opacity" 
+                              alt="Bukti Foto Absen"
+                              onError={(e) => {
+                                  if (!e.target.dataset.retried && g.photo.includes('lh3.googleusercontent.com')) {
+                                      e.target.dataset.retried = 'true';
+                                      const match = g.photo.match(/d\/([a-zA-Z0-9_-]+)/);
+                                      if (match) e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+                                  } else {
+                                      e.target.src = 'https://via.placeholder.com/150?text=Error';
+                                  }
+                              }}
+                           />
+                       </div>
                     ) : ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title={isBelumAbsen ? "Belum Absen" : "Tanpa Foto Absen"}><UserCircle size={16} className="text-gray-400" /></div> )}
                   </td>
                   <td className="px-6 py-4"><p className={`font-medium ${isAlpha ? 'text-red-700' : 'text-gray-900'}`}>{String(g.userName || '-')}</p><p className="text-xs text-gray-500 mt-0.5">{String(g.role || '-')} • {String(g.penempatan || '-')}</p></td>
@@ -1062,7 +1160,23 @@ function AbsensiDetailedTable({ list, onPhoto, onDetail, karyawan, filterTanggal
                     ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><FileText size={18} className="text-[#1a73e8]" /></div>
                     ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><Clock size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
-                    ) : g.photo && String(g.photo).trim() !== '' ? ( <div className="w-10 h-10 cursor-pointer" onClick={()=>onPhoto(g.photo)}><img src={g.photo} className="w-full h-full rounded object-cover border border-gray-200 hover:opacity-80 transition-opacity" alt="Bukti Foto Absen" /></div>
+                    ) : g.photo && String(g.photo).trim() !== '' ? ( 
+                       <div className="w-10 h-10 cursor-pointer overflow-hidden rounded border border-gray-200" onClick={()=>onPhoto(g.photo)}>
+                           <img 
+                              src={g.photo} 
+                              className="w-full h-full object-cover hover:opacity-80 transition-opacity" 
+                              alt="Bukti Foto Absen"
+                              onError={(e) => {
+                                  if (!e.target.dataset.retried && g.photo.includes('lh3.googleusercontent.com')) {
+                                      e.target.dataset.retried = 'true';
+                                      const match = g.photo.match(/d\/([a-zA-Z0-9_-]+)/);
+                                      if (match) e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+                                  } else {
+                                      e.target.src = 'https://via.placeholder.com/150?text=Error';
+                                  }
+                              }}
+                           />
+                       </div>
                     ) : ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title={isBelumAbsen ? "Belum Absen" : "Tanpa Foto Absen"}><UserCircle size={16} className="text-gray-400" /></div> )}
                   </td>
                   <td className="px-6 py-4"><div><p className={`font-medium ${isAlpha ? 'text-red-700' : 'text-gray-900'}`}>{String(g.userName || '-')}</p><p className="text-xs text-gray-500 mt-0.5">{String(g.role || '-')}</p></div></td>
@@ -1090,7 +1204,10 @@ function AbsensiDetailedTable({ list, onPhoto, onDetail, karyawan, filterTanggal
   );
 }
 
-function KaryawanTable({ list, validCuti, onDetail, onAdd, onDelete, filterDivisi, setFilterDivisi, filterPenempatan, setFilterPenempatan, searchTerm, uniquePlacements = [] }) {
+// ==========================================
+// KARYAWAN TABLE DENGAN PENANGANAN ERROR
+// ==========================================
+function KaryawanTable({ list, validCuti, onDetail, onAdd, onDelete, filterDivisi, setFilterDivisi, filterPenempatan, setFilterPenempatan, searchTerm, uniquePlacements = [], fetchError }) {
   const currentYear = new Date().getFullYear();
   
   const cutiStats = useMemo(() => {
@@ -1168,7 +1285,29 @@ function KaryawanTable({ list, validCuti, onDetail, onAdd, onDelete, filterDivis
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2"><button onClick={()=>onDetail(k)} className="p-1.5 text-gray-500 hover:text-[#1a73e8] hover:bg-gray-100 rounded transition-colors" title="Detail Pegawai"><Eye size={18}/></button><button onClick={()=>{ if(window.confirm(`Apakah Anda yakin ingin menghapus data pegawai ${k.name}? (Tindakan ini tidak bisa dibatalkan)`)) onDelete(k.id); }} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Hapus Pegawai"><Trash2 size={18}/></button></div></td>
                 </tr>
               ))}
-              {filteredList.length === 0 && (<tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada data pegawai yang sesuai.</td></tr>)}
+              
+              {/* PENANGANAN KETIKA DATA KOSONG */}
+              {filteredList.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="p-12 text-center">
+                    {fetchError ? (
+                        <div className="flex flex-col items-center justify-center text-red-500">
+                           <AlertTriangle size={36} className="mb-3" />
+                           <h4 className="font-bold text-gray-900">Gagal Membaca Data</h4>
+                           <p className="text-sm mt-1 text-red-600 max-w-md">{fetchError}</p>
+                           <button onClick={() => window.location.reload()} className="mt-4 bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-medium text-sm hover:bg-gray-200 transition-colors border border-gray-300">
+                             Muat Ulang Halaman
+                           </button>
+                        </div>
+                    ) : (
+                        <div className="text-gray-500 flex flex-col items-center">
+                           <Users size={32} className="text-gray-300 mb-2" />
+                           <p>Tidak ada data pegawai yang sesuai pencarian atau tabel di server kosong.</p>
+                        </div>
+                    )}
+                  </td>
+                </tr>
+              )}
             </tbody>
         </table>
       </div>
@@ -1262,10 +1401,10 @@ function ProfilPegawaiModal({ personel, onClose, onEdit }) {
   useEffect(() => {
      if (personel && !isEditing) {
          setEditForm({
-            id: personel.id || '', name: personel.name || '', 
-            role: personel.role || 'Umum', penempatan: personel.penempatan || '',
-            pekerjaan: personel.pekerjaan || '', phone: personel.phone || '',
-            password: personel.password || '', tglGabung: formatToInputDate(personel.tglGabung) || new Date().toISOString().split('T')[0]
+             id: personel.id || '', name: personel.name || '', 
+             role: personel.role || 'Umum', penempatan: personel.penempatan || '',
+             pekerjaan: personel.pekerjaan || '', phone: personel.phone || '',
+             password: personel.password || '', tglGabung: formatToInputDate(personel.tglGabung) || new Date().toISOString().split('T')[0]
          });
      }
   }, [personel, isEditing]);
@@ -1640,7 +1779,26 @@ function LaporanView({ list, onPhoto, filterTanggal, setFilterTanggal, filterDiv
                   <td className="px-6 py-4 align-top"><div><p className="font-medium text-gray-900">{String(l.nama || l.name || '-')}</p><p className="text-xs text-gray-500 mt-0.5">{String(l.role || '-')} • {String(l.penempatan || '-')}</p></div></td>
                   <td className="px-6 py-4 align-top text-xs text-gray-600">{String(l.waktu || l.time || '-')}</td>
                   <td className="px-6 py-4 max-w-lg align-top"><p className="text-gray-700 text-sm whitespace-pre-wrap">{String(l.teks || l.text || '-')}</p></td>
-                  <td className="px-6 py-4 align-top text-right">{l.photo ? (<button onClick={()=>onPhoto(l.photo)} className="text-[#1a73e8] hover:text-[#1557b0] p-2 hover:bg-blue-50 rounded-full transition-colors inline-block"><ImageIcon size={20}/></button>) : <span className="text-gray-400 text-xs">Tanpa Foto</span>}</td>
+                  <td className="px-6 py-4 align-top text-right">
+                    {l.photo && String(l.photo).trim() !== '' ? (
+                       <div className="w-16 h-16 cursor-pointer overflow-hidden rounded border border-gray-200 ml-auto" onClick={()=>onPhoto(l.photo)}>
+                           <img 
+                              src={l.photo} 
+                              className="w-full h-full object-cover hover:opacity-80 transition-opacity" 
+                              alt="Foto Laporan"
+                              onError={(e) => {
+                                  if (!e.target.dataset.retried && l.photo.includes('lh3.googleusercontent.com')) {
+                                      e.target.dataset.retried = 'true';
+                                      const match = l.photo.match(/d\/([a-zA-Z0-9_-]+)/);
+                                      if (match) e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+                                  } else {
+                                      e.target.src = 'https://via.placeholder.com/150?text=Error';
+                                  }
+                              }}
+                           />
+                       </div>
+                    ) : <span className="text-gray-400 text-xs">Tanpa Foto</span>}
+                  </td>
                 </tr>
               ))}
               {filteredList.length === 0 && (<tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada laporan kerja untuk filter waktu ini.</td></tr>)}
