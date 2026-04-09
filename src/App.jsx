@@ -1002,7 +1002,7 @@ function DashboardOverview({ data, groupedAbsensi, filterTanggal, setFilterTangg
              className="md:col-span-1 md:row-span-1 bg-white border border-gray-200 rounded-2xl p-6 flex flex-col justify-center shadow-sm hover:shadow-md hover:border-yellow-400 hover:-translate-y-1 transition-all duration-300 cursor-pointer group">
              <div className="flex justify-between items-start mb-4">
                <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center text-[#f29900] group-hover:scale-110 transition-transform">
-                 <Briefcase size={20} />
+                 <User size={20} />
                </div>
              </div>
              <p className="text-3xl font-bold text-gray-900">{categories['Izin Pribadi'].length}</p>
@@ -1025,14 +1025,14 @@ function DashboardOverview({ data, groupedAbsensi, filterTanggal, setFilterTangg
              <div>
                <div className="flex items-center gap-3 mb-2">
                  <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-[#1a73e8] group-hover:scale-110 transition-transform">
-                   <FileText size={20} />
+                   <Calendar size={20} />
                  </div>
                  <h3 className="text-gray-600 font-medium">Sedang Cuti / Off Shift</h3>
                </div>
                <p className="text-4xl font-bold text-gray-900 mt-2">{categories['Cuti'].length}</p>
              </div>
              <div className="w-20 h-20 bg-blue-50/50 rounded-full flex items-center justify-center flex-shrink-0 relative overflow-hidden group-hover:bg-blue-50 transition-colors">
-                <MapPin size={40} className="text-blue-200" />
+                <Coffee size={40} className="text-blue-200" />
              </div>
         </div>
 
@@ -1083,8 +1083,8 @@ function DashboardDetailModal({ title, list, onClose, onPhoto, displayDateStr })
                   <td className="px-6 py-4">
                     {isAlpha ? ( <div className="w-10 h-10 rounded bg-red-50 flex items-center justify-center border border-red-100" title="Alpha"><XCircle size={18} className="text-red-500" /></div>
                     ) : g.pengajuan === 'OFFDAY' || g.statusText === 'AKHIR PEKAN' ? ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title="Libur"><MinusCircle size={16} className="text-gray-400" /></div>
-                    ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><FileText size={18} className="text-[#1a73e8]" /></div>
-                    ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><Clock size={18} className="text-yellow-600" /></div>
+                    ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><Calendar size={18} className="text-[#1a73e8]" /></div>
+                    ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><User size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
                     ) : g.photo && String(g.photo).trim() !== '' ? ( 
                        <div className="w-10 h-10 cursor-pointer overflow-hidden rounded border border-gray-200" onClick={()=>onPhoto(g.photo)}>
@@ -1157,8 +1157,8 @@ function AbsensiDetailedTable({ list, onPhoto, onDetail, karyawan, filterTanggal
                   <td className="px-6 py-4">
                     {isAlpha ? ( <div className="w-10 h-10 rounded bg-red-50 flex items-center justify-center border border-red-100" title="Alpha"><XCircle size={18} className="text-red-500" /></div>
                     ) : g.pengajuan === 'OFFDAY' || g.statusText === 'AKHIR PEKAN' ? ( <div className="w-10 h-10 rounded bg-gray-100 flex flex-col items-center justify-center border border-gray-200" title="Sedang Libur / Off Shift"><MinusCircle size={16} className="text-gray-400" /></div>
-                    ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><FileText size={18} className="text-[#1a73e8]" /></div>
-                    ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><Clock size={18} className="text-yellow-600" /></div>
+                    ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><Calendar size={18} className="text-[#1a73e8]" /></div>
+                    ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><User size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
                     ) : g.photo && String(g.photo).trim() !== '' ? ( 
                        <div className="w-10 h-10 cursor-pointer overflow-hidden rounded border border-gray-200" onClick={()=>onPhoto(g.photo)}>
