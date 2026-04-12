@@ -869,7 +869,7 @@ function AdminDashboard({ onLogout }) {
       <main className="flex-1 flex flex-col min-w-0 bg-[#f8f9fa] overflow-hidden relative">
         <header className="bg-white h-16 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-10">
           <div className="flex items-center gap-4">
-              {/* Tombol menu (kiri) telah dihilangkan seperti yang diminta */}
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"><Menu size={20} /></button>
               <h2 className="font-normal text-xl text-gray-800 capitalize">{activeMenu.replace('-', ' ')}</h2>
               
               {/* INDIKATOR STATUS SINKRONISASI */}
@@ -993,8 +993,8 @@ function DashboardOverview({ data, groupedAbsensi, filterTanggal, setFilterTangg
                </div>
                <p className="text-4xl font-bold text-gray-900 mt-2">{categories['Terlambat'].length}</p>
              </div>
-             <div className="w-20 h-20 bg-red-50/50 rounded-full flex items-center justify-center flex-shrink-0 relative overflow-hidden group-hover:bg-red-50 transition-colors">
-                <Clock size={40} className="text-red-200" />
+             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-red-100 transition-colors">
+                <Clock size={32} className="text-red-400" />
              </div>
         </div>
 
@@ -1031,8 +1031,8 @@ function DashboardOverview({ data, groupedAbsensi, filterTanggal, setFilterTangg
                </div>
                <p className="text-4xl font-bold text-gray-900 mt-2">{categories['Cuti'].length}</p>
              </div>
-             <div className="w-20 h-20 bg-blue-50/50 rounded-full flex items-center justify-center flex-shrink-0 relative overflow-hidden group-hover:bg-blue-50 transition-colors">
-                <Coffee size={40} className="text-blue-200" />
+             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-blue-100 transition-colors">
+                <Coffee size={32} className="text-blue-400" />
              </div>
         </div>
 
@@ -1047,8 +1047,8 @@ function DashboardOverview({ data, groupedAbsensi, filterTanggal, setFilterTangg
                </div>
                <p className="text-4xl font-bold text-gray-900 mt-2">{categories['Tanpa Keterangan'].length}</p>
              </div>
-             <div className="w-20 h-20 bg-gray-100/50 rounded-full flex items-center justify-center flex-shrink-0 relative overflow-hidden group-hover:bg-gray-100 transition-colors">
-                <MinusCircle size={40} className="text-gray-300" />
+             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 transition-colors">
+                <MinusCircle size={32} className="text-gray-400" />
              </div>
         </div>
 
@@ -1082,7 +1082,7 @@ function DashboardDetailModal({ title, list, onClose, onPhoto, displayDateStr })
                 <tr key={String(g.id || i)} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     {isAlpha ? ( <div className="w-10 h-10 rounded bg-red-50 flex items-center justify-center border border-red-100" title="Alpha"><XCircle size={18} className="text-red-500" /></div>
-                    ) : g.pengajuan === 'OFFDAY' || g.statusText === 'AKHIR PEKAN' ? ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title="Libur"><MinusCircle size={16} className="text-gray-400" /></div>
+                    ) : g.pengajuan === 'OFFDAY' || g.statusText === 'AKHIR PEKAN' ? ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title="Libur"><Coffee size={16} className="text-gray-500" /></div>
                     ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><Calendar size={18} className="text-[#1a73e8]" /></div>
                     ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><User size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
@@ -1156,7 +1156,7 @@ function AbsensiDetailedTable({ list, onPhoto, onDetail, karyawan, filterTanggal
                 <tr key={String(g.id || i)} className={`hover:bg-gray-50 transition-colors`}>
                   <td className="px-6 py-4">
                     {isAlpha ? ( <div className="w-10 h-10 rounded bg-red-50 flex items-center justify-center border border-red-100" title="Alpha"><XCircle size={18} className="text-red-500" /></div>
-                    ) : g.pengajuan === 'OFFDAY' || g.statusText === 'AKHIR PEKAN' ? ( <div className="w-10 h-10 rounded bg-gray-100 flex flex-col items-center justify-center border border-gray-200" title="Sedang Libur / Off Shift"><MinusCircle size={16} className="text-gray-400" /></div>
+                    ) : g.pengajuan === 'OFFDAY' || g.statusText === 'AKHIR PEKAN' ? ( <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center border border-gray-200" title="Sedang Libur / Off Shift"><Coffee size={16} className="text-gray-500" /></div>
                     ) : g.pengajuan === 'CUTI' ? ( <div className="w-10 h-10 rounded bg-blue-50 flex items-center justify-center border border-blue-200" title="Cuti"><Calendar size={18} className="text-[#1a73e8]" /></div>
                     ) : g.pengajuan === 'IZIN' ? ( <div className="w-10 h-10 rounded bg-yellow-50 flex items-center justify-center border border-yellow-200" title="Izin"><User size={18} className="text-yellow-600" /></div>
                     ) : g.pengajuan === 'SAKIT' ? ( <div className="w-10 h-10 rounded bg-purple-50 flex items-center justify-center border border-purple-200" title="Sakit"><Activity size={18} className="text-purple-600" /></div>
@@ -1593,8 +1593,8 @@ function LogAbsensiModal({ personel, allAbsensi, cuti, appSettings, onClose }) {
               <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center"><AlertCircle size={24} className="text-[#f29900] mb-2"/><p className="text-xl font-bold text-gray-900">{rawStats.tTelat}</p><p className="text-[10px] font-bold text-gray-500 uppercase mt-1">Terlambat</p></div>
               <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center"><XCircle size={24} className="text-[#c5221f] mb-2"/><p className="text-xl font-bold text-gray-900">{rawStats.tAlpha}</p><p className="text-[10px] font-bold text-gray-500 uppercase mt-1">Tanpa Keterangan</p></div>
               <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center"><Activity size={24} className="text-[#9333ea] mb-2"/><p className="text-xl font-bold text-gray-900">{rawStats.tSakit}</p><p className="text-[10px] font-bold text-gray-500 uppercase mt-1">Izin Sakit</p></div>
-              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center"><Clock size={24} className="text-[#f29900] mb-2"/><p className="text-xl font-bold text-gray-900">{rawStats.tIzin}</p><p className="text-[10px] font-bold text-gray-500 uppercase mt-1">Izin Pribadi</p></div>
-              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center"><FileText size={24} className="text-[#1a73e8] mb-2"/><p className="text-xl font-bold text-gray-900">{rawStats.tCuti}</p><p className="text-[10px] font-bold text-gray-500 uppercase mt-1">Cuti / Off</p></div>
+              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center"><User size={24} className="text-[#f29900] mb-2"/><p className="text-xl font-bold text-gray-900">{rawStats.tIzin}</p><p className="text-[10px] font-bold text-gray-500 uppercase mt-1">Izin Pribadi</p></div>
+              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center"><Calendar size={24} className="text-[#1a73e8] mb-2"/><p className="text-xl font-bold text-gray-900">{rawStats.tCuti}</p><p className="text-[10px] font-bold text-gray-500 uppercase mt-1">Cuti / Off</p></div>
            </div>
 
            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -1780,24 +1780,7 @@ function LaporanView({ list, onPhoto, filterTanggal, setFilterTanggal, filterDiv
                   <td className="px-6 py-4 align-top text-xs text-gray-600">{String(l.waktu || l.time || '-')}</td>
                   <td className="px-6 py-4 max-w-lg align-top"><p className="text-gray-700 text-sm whitespace-pre-wrap">{String(l.teks || l.text || '-')}</p></td>
                   <td className="px-6 py-4 align-top text-right">
-                    {l.photo && String(l.photo).trim() !== '' ? (
-                       <div className="w-16 h-16 cursor-pointer overflow-hidden rounded border border-gray-200 ml-auto" onClick={()=>onPhoto(l.photo)}>
-                           <img 
-                              src={l.photo} 
-                              className="w-full h-full object-cover hover:opacity-80 transition-opacity" 
-                              alt="Foto Laporan"
-                              onError={(e) => {
-                                  if (!e.target.dataset.retried && l.photo.includes('lh3.googleusercontent.com')) {
-                                      e.target.dataset.retried = 'true';
-                                      const match = l.photo.match(/d\/([a-zA-Z0-9_-]+)/);
-                                      if (match) e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
-                                  } else {
-                                      e.target.src = 'https://via.placeholder.com/150?text=Error';
-                                  }
-                              }}
-                           />
-                       </div>
-                    ) : <span className="text-gray-400 text-xs">Tanpa Foto</span>}
+                    {l.photo ? (<button onClick={()=>onPhoto(l.photo)} className="text-[#1a73e8] hover:text-[#1557b0] p-2 hover:bg-blue-50 rounded-full transition-colors inline-block"><ImageIcon size={20}/></button>) : <span className="text-gray-400 text-xs">Tanpa Foto</span>}
                   </td>
                 </tr>
               ))}
