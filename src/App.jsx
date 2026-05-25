@@ -665,9 +665,22 @@ if (typeof document !== "undefined" && !document.getElementById("karsa-compact-a
       box-shadow: none !important;
       border: 0 !important;
       overflow: visible !important;
+      margin: 0 auto !important;
+      display: grid !important;
+      place-items: center !important;
     }
 
-    $1
+    #root .karsa-login-logo-box img {
+      width: 122px !important;
+      height: 122px !important;
+      max-width: 122px !important;
+      max-height: 122px !important;
+      object-fit: contain !important;
+      display: block !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
 
     #root .karsa-login-admin-title {
       margin-top: 14px !important;
@@ -4218,10 +4231,11 @@ function LoginScreen({ onLogin, loading }) {
   return (
     <div className="karsa-login-screen min-h-[100dvh] bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_36%,#fff_100%)] px-4 py-8 text-slate-900">
       <div className="karsa-login-wrap mx-auto flex min-h-[calc(100dvh-4rem)] max-w-xl flex-col justify-center">
-        <div className="mb-8 text-center">
-          $1
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="karsa-login-logo-box">
+            <img src={COMPANY_LOGO_URL} alt="Logo PT. Karsa Sentana Lumbung Sentosa" />
+          </div>
           <p className="karsa-login-admin-title">ADMIN</p>
-          <p className="karsa-login-admin-subtitle">Panel Absensi</p>
         </div>
 
         <form onSubmit={submit} className="karsa-login-card rounded-[2rem] bg-white p-7 shadow-2xl shadow-slate-200 ring-1 ring-slate-100">
