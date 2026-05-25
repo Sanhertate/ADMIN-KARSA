@@ -4202,12 +4202,10 @@ function LoginScreen({ onLogin, loading }) {
   return (
     <div className="karsa-login-screen min-h-[100dvh] bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_36%,#fff_100%)] px-4 py-8 text-slate-900">
       <div className="karsa-login-wrap mx-auto flex min-h-[calc(100dvh-4rem)] max-w-xl flex-col justify-center">
-        <div className="mb-6 text-center">
-          <div className="karsa-login-logo-box mx-auto mb-5 grid h-28 w-28 place-items-center">
+        <div className="mb-8 text-center">
+          <div className="karsa-login-logo-box mx-auto grid h-28 w-28 place-items-center">
             <img src={COMPANY_LOGO_URL} alt="Logo" className="h-full w-full object-contain" />
           </div>
-          <h1 className="mt-2 text-4xl font-black text-slate-950">Absensi Karyawan Karsa</h1>
-          <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-500">Rekap absensi, laporan, cuti, pesan admin, dan database karyawan.</p>
         </div>
 
         <form onSubmit={submit} className="karsa-login-card rounded-[2rem] bg-white p-7 shadow-2xl shadow-slate-200 ring-1 ring-slate-100">
