@@ -1043,10 +1043,117 @@ if (typeof document !== "undefined" && !document.getElementById(ADMIN_LOGO_CLEAN
   const style = document.createElement("style");
   style.id = ADMIN_LOGO_CLEANUP_STYLE_ID;
   style.textContent = `
-    aside div:has(> img[alt*="Logo"]),
-    aside div:has(> img[alt*="logo"]),
-    aside div:has(> img[src*="logo"]),
-    aside div:has(> img[src*="Logo"]) {
+    :root {
+      --karsa-admin-title-size: 44px;
+      --karsa-admin-logo-size: 74px;
+    }
+
+    /* Brand sidebar/home: logo sejajar tengah dengan tulisan ADMIN */
+    #root .karsa-admin-brand-row {
+      display: flex !important;
+      align-items: center !important;
+      gap: 14px !important;
+      min-height: var(--karsa-admin-logo-size) !important;
+    }
+
+    #root .karsa-admin-brand-logo-box {
+      width: var(--karsa-admin-logo-size) !important;
+      height: var(--karsa-admin-logo-size) !important;
+      min-width: var(--karsa-admin-logo-size) !important;
+      min-height: var(--karsa-admin-logo-size) !important;
+      padding: 0 !important;
+      display: grid !important;
+      place-items: center !important;
+      background: transparent !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+      overflow: visible !important;
+      flex-shrink: 0 !important;
+    }
+
+    #root .karsa-admin-brand-logo-box img {
+      width: var(--karsa-admin-logo-size) !important;
+      height: var(--karsa-admin-logo-size) !important;
+      max-width: var(--karsa-admin-logo-size) !important;
+      max-height: var(--karsa-admin-logo-size) !important;
+      object-fit: contain !important;
+      display: block !important;
+      background: transparent !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+
+    #root .karsa-admin-brand-text {
+      display: flex !important;
+      min-width: 0 !important;
+      flex: 1 !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      transform: translateY(-1px) !important;
+    }
+
+    #root .karsa-admin-brand-title,
+    #root .karsa-login-admin-title {
+      margin: 0 !important;
+      font-size: var(--karsa-admin-title-size) !important;
+      line-height: 0.92 !important;
+      font-weight: 950 !important;
+      letter-spacing: -0.06em !important;
+      color: #0f172a !important;
+    }
+
+    #root .karsa-admin-brand-subtitle {
+      margin-top: 6px !important;
+      font-size: 10px !important;
+      line-height: 1 !important;
+      font-weight: 950 !important;
+      letter-spacing: 0.16em !important;
+      color: #2563eb !important;
+      text-transform: uppercase !important;
+    }
+
+    /* Login page: ADMIN dibuat sama besar dengan home/sidebar */
+    #root .karsa-login-admin-title {
+      margin-top: 14px !important;
+      text-align: center !important;
+    }
+
+    #root .karsa-login-logo-box {
+      width: 122px !important;
+      height: 122px !important;
+      min-width: 122px !important;
+      min-height: 122px !important;
+      padding: 0 !important;
+      display: grid !important;
+      place-items: center !important;
+      background: transparent !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+      overflow: visible !important;
+      margin: 0 auto !important;
+    }
+
+    #root .karsa-login-logo-box img {
+      width: 122px !important;
+      height: 122px !important;
+      max-width: 122px !important;
+      max-height: 122px !important;
+      object-fit: contain !important;
+      display: block !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    aside div:has(> img[alt*="Logo"]):not(.karsa-admin-brand-logo-box),
+    aside div:has(> img[alt*="logo"]):not(.karsa-admin-brand-logo-box),
+    aside div:has(> img[src*="logo"]):not(.karsa-admin-brand-logo-box),
+    aside div:has(> img[src*="Logo"]):not(.karsa-admin-brand-logo-box) {
       width: 64px !important;
       height: 64px !important;
       min-width: 64px !important;
@@ -1058,10 +1165,10 @@ if (typeof document !== "undefined" && !document.getElementById(ADMIN_LOGO_CLEAN
       outline: 0 !important;
     }
 
-    aside div:has(> img[alt*="Logo"]) > img,
-    aside div:has(> img[alt*="logo"]) > img,
-    aside div:has(> img[src*="logo"]) > img,
-    aside div:has(> img[src*="Logo"]) > img {
+    aside div:has(> img[alt*="Logo"]):not(.karsa-admin-brand-logo-box) > img,
+    aside div:has(> img[alt*="logo"]):not(.karsa-admin-brand-logo-box) > img,
+    aside div:has(> img[src*="logo"]):not(.karsa-admin-brand-logo-box) > img,
+    aside div:has(> img[src*="Logo"]):not(.karsa-admin-brand-logo-box) > img {
       width: 64px !important;
       height: 64px !important;
       max-width: 64px !important;
@@ -1071,6 +1178,12 @@ if (typeof document !== "undefined" && !document.getElementById(ADMIN_LOGO_CLEAN
       background: transparent !important;
       border-radius: 0 !important;
       box-shadow: none !important;
+    }
+
+    @media (max-width: 640px) {
+      :root {
+        --karsa-admin-title-size: 40px;
+      }
     }
   `;
   document.head.appendChild(style);
@@ -4272,13 +4385,13 @@ function Sidebar({ active, setActive, onLogout }) {
           <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-blue-100/60 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-slate-100 blur-2xl" />
 
-          <div className="relative flex items-center gap-3.5">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[1.25rem] bg-slate-50 p-2.5 shadow-sm ring-1 ring-slate-200">
-              <img src={COMPANY_LOGO_URL} alt="Logo PT. Karsa Sentana Lumbung Sentosa" className="h-full w-full object-contain" />
+          <div className="relative karsa-admin-brand-row">
+            <div className="karsa-admin-brand-logo-box">
+              <img src={COMPANY_LOGO_URL} alt="Logo PT. Karsa Sentana Lumbung Sentosa" />
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[2rem] font-black uppercase leading-none tracking-[-0.055em] text-slate-950">ADMIN</p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-blue-700">Panel Absensi</p>
+            <div className="karsa-admin-brand-text">
+              <p className="karsa-admin-brand-title">ADMIN</p>
+              <p className="karsa-admin-brand-subtitle">Panel Absensi</p>
             </div>
           </div>
 
