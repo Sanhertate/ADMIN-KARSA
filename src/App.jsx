@@ -640,6 +640,81 @@ if (typeof document !== "undefined" && !document.getElementById("karsa-compact-a
       #root [class*="lg:grid-cols-4"] {
         gap: 12px !important;
       }
+
+    /* Login screen dibuat terpisah dari compact dashboard agar tidak ikut mengecil */
+    #root .karsa-login-screen {
+      min-height: 100dvh !important;
+      padding: 42px 18px !important;
+      overflow-y: auto !important;
+    }
+
+    #root .karsa-login-wrap {
+      width: 100% !important;
+      max-width: 620px !important;
+      min-height: calc(100dvh - 84px) !important;
+    }
+
+    #root .karsa-login-logo-box {
+      width: 122px !important;
+      height: 122px !important;
+      border-radius: 26px !important;
+      padding: 16px !important;
+    }
+
+    #root .karsa-login-screen h1 {
+      font-size: clamp(32px, 2.4vw, 44px) !important;
+      line-height: 1.08 !important;
+      letter-spacing: -0.055em !important;
+    }
+
+    #root .karsa-login-screen p {
+      font-size: 14px !important;
+      line-height: 1.6 !important;
+    }
+
+    #root .karsa-login-card {
+      padding: 30px !important;
+      border-radius: 26px !important;
+    }
+
+    #root .karsa-login-card label span {
+      font-size: 12px !important;
+      letter-spacing: 0.055em !important;
+    }
+
+    #root .karsa-login-card input {
+      min-height: 54px !important;
+      height: 54px !important;
+      border-radius: 16px !important;
+      padding: 0 16px !important;
+      font-size: 14px !important;
+      font-weight: 800 !important;
+      background: #f8fbff !important;
+    }
+
+    #root .karsa-login-card button {
+      min-height: 54px !important;
+      height: 54px !important;
+      border-radius: 16px !important;
+      padding: 0 20px !important;
+      font-size: 13px !important;
+      letter-spacing: 0.035em !important;
+    }
+
+    @media (max-width: 640px) {
+      #root .karsa-login-wrap {
+        max-width: 100% !important;
+      }
+
+      #root .karsa-login-card {
+        padding: 22px !important;
+      }
+
+      #root .karsa-login-logo-box {
+        width: 104px !important;
+        height: 104px !important;
+      }
+    }
     }
   `;
   document.head.appendChild(compactStyle);
@@ -4094,18 +4169,18 @@ function LoginScreen({ onLogin, loading }) {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_36%,#fff_100%)] px-4 py-8 text-slate-900">
-      <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-md flex-col justify-center">
+    <div className="karsa-login-screen min-h-[100dvh] bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_36%,#fff_100%)] px-4 py-8 text-slate-900">
+      <div className="karsa-login-wrap mx-auto flex min-h-[calc(100dvh-4rem)] max-w-xl flex-col justify-center">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 grid h-24 w-24 place-items-center rounded-[2rem] bg-white p-3 shadow-xl shadow-blue-100">
+          <div className="karsa-login-logo-box mx-auto mb-5 grid h-28 w-28 place-items-center rounded-[2rem] bg-white p-4 shadow-xl shadow-blue-100">
             <img src={COMPANY_LOGO_URL} alt="Logo" className="h-full w-full object-contain" />
           </div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">Panel Admin</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-950">Absensi Karyawan Karsa</h1>
+          <h1 className="mt-2 text-4xl font-black text-slate-950">Absensi Karyawan Karsa</h1>
           <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-500">Rekap absensi, laporan, cuti, pesan admin, dan database karyawan.</p>
         </div>
 
-        <form onSubmit={submit} className="rounded-[2rem] bg-white p-5 shadow-2xl shadow-slate-200 ring-1 ring-slate-100">
+        <form onSubmit={submit} className="karsa-login-card rounded-[2rem] bg-white p-7 shadow-2xl shadow-slate-200 ring-1 ring-slate-100">
           {error && <p className="mb-4 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700 ring-1 ring-red-100">{error}</p>}
           <label className="block">
             <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Username</span>
