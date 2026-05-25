@@ -667,11 +667,27 @@ if (typeof document !== "undefined" && !document.getElementById("karsa-compact-a
       overflow: visible !important;
     }
 
-    #root .karsa-login-logo-box img {
-      width: 122px !important;
-      height: 122px !important;
-      object-fit: contain !important;
-      filter: drop-shadow(0 14px 24px rgba(15, 23, 42, 0.12));
+    $1
+
+    #root .karsa-login-admin-title {
+      margin-top: 14px !important;
+      font-size: clamp(32px, 2.4vw, 44px) !important;
+      line-height: 1 !important;
+      letter-spacing: -0.055em !important;
+      font-weight: 950 !important;
+      color: #0f172a !important;
+      text-align: center !important;
+    }
+
+    #root .karsa-login-admin-subtitle {
+      margin-top: 6px !important;
+      font-size: 12px !important;
+      line-height: 1.2 !important;
+      letter-spacing: 0.18em !important;
+      font-weight: 900 !important;
+      color: #2563eb !important;
+      text-align: center !important;
+      text-transform: uppercase !important;
     }
 
     #root .karsa-login-input-icon {
@@ -785,8 +801,8 @@ const LEAVE_APPROVAL_SIGNATURE_IMAGE_URL = COMPANY_STAMP_SIGNATURE_IMAGE_URL;
 // Catatan penting:
 // File favicon tetap harus berada di folder: public/favicon-karsa-full.png
 // Kode ini memaksa browser mengganti favicon walaupun index.html/cache masih menyimpan icon lama.
-const ADMIN_FAVICON_URL = "/favicon-karsa-full.png";
-const ADMIN_FAVICON_VERSION = "20260525-02";
+const ADMIN_FAVICON_URL = COMPANY_LOGO_URL;
+const ADMIN_FAVICON_VERSION = "20260525-admin-logo";
 
 function forceAdminFavicon() {
   if (typeof document === "undefined") return;
@@ -4203,9 +4219,9 @@ function LoginScreen({ onLogin, loading }) {
     <div className="karsa-login-screen min-h-[100dvh] bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_36%,#fff_100%)] px-4 py-8 text-slate-900">
       <div className="karsa-login-wrap mx-auto flex min-h-[calc(100dvh-4rem)] max-w-xl flex-col justify-center">
         <div className="mb-8 text-center">
-          <div className="karsa-login-logo-box mx-auto grid h-28 w-28 place-items-center">
-            <img src={COMPANY_LOGO_URL} alt="Logo" className="h-full w-full object-contain" />
-          </div>
+          $1
+          <p className="karsa-login-admin-title">ADMIN</p>
+          <p className="karsa-login-admin-subtitle">Panel Absensi</p>
         </div>
 
         <form onSubmit={submit} className="karsa-login-card rounded-[2rem] bg-white p-7 shadow-2xl shadow-slate-200 ring-1 ring-slate-100">
