@@ -19,6 +19,8 @@ import {
   Home,
   IdCard,
   Loader2,
+  LockKeyhole,
+  LogIn,
   LogOut,
   Mail,
   MapPin,
@@ -657,8 +659,32 @@ if (typeof document !== "undefined" && !document.getElementById("karsa-compact-a
     #root .karsa-login-logo-box {
       width: 122px !important;
       height: 122px !important;
-      border-radius: 26px !important;
-      padding: 16px !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      overflow: visible !important;
+    }
+
+    #root .karsa-login-logo-box img {
+      width: 122px !important;
+      height: 122px !important;
+      object-fit: contain !important;
+      filter: drop-shadow(0 14px 24px rgba(15, 23, 42, 0.12));
+    }
+
+    #root .karsa-login-input-icon {
+      position: absolute !important;
+      left: 16px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      color: #2563eb !important;
+      pointer-events: none !important;
+    }
+
+    #root .karsa-login-card input.karsa-login-input-with-icon {
+      padding-left: 46px !important;
     }
 
     #root .karsa-login-screen h1 {
@@ -711,6 +737,11 @@ if (typeof document !== "undefined" && !document.getElementById("karsa-compact-a
       }
 
       #root .karsa-login-logo-box {
+        width: 104px !important;
+        height: 104px !important;
+      }
+
+      #root .karsa-login-logo-box img {
         width: 104px !important;
         height: 104px !important;
       }
@@ -4172,10 +4203,9 @@ function LoginScreen({ onLogin, loading }) {
     <div className="karsa-login-screen min-h-[100dvh] bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_36%,#fff_100%)] px-4 py-8 text-slate-900">
       <div className="karsa-login-wrap mx-auto flex min-h-[calc(100dvh-4rem)] max-w-xl flex-col justify-center">
         <div className="mb-6 text-center">
-          <div className="karsa-login-logo-box mx-auto mb-5 grid h-28 w-28 place-items-center rounded-[2rem] bg-white p-4 shadow-xl shadow-blue-100">
+          <div className="karsa-login-logo-box mx-auto mb-5 grid h-28 w-28 place-items-center">
             <img src={COMPANY_LOGO_URL} alt="Logo" className="h-full w-full object-contain" />
           </div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">Panel Admin</p>
           <h1 className="mt-2 text-4xl font-black text-slate-950">Absensi Karyawan Karsa</h1>
           <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-500">Rekap absensi, laporan, cuti, pesan admin, dan database karyawan.</p>
         </div>
@@ -4183,18 +4213,23 @@ function LoginScreen({ onLogin, loading }) {
         <form onSubmit={submit} className="karsa-login-card rounded-[2rem] bg-white p-7 shadow-2xl shadow-slate-200 ring-1 ring-slate-100">
           {error && <p className="mb-4 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700 ring-1 ring-red-100">{error}</p>}
           <label className="block">
-            <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Username</span>
-            <input value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" placeholder="admin" />
+            <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Login</span>
+            <span className="relative block">
+              <LogIn className="karsa-login-input-icon" size={18} />
+              <input value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} className="karsa-login-input-with-icon min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" placeholder="Login" />
+            </span>
           </label>
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">PIN / Password</span>
-            <input type="password" value={form.pin} onChange={(e) => setForm((p) => ({ ...p, pin: e.target.value }))} className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" placeholder="Masukkan PIN admin" />
+            <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Password</span>
+            <span className="relative block">
+              <LockKeyhole className="karsa-login-input-icon" size={18} />
+              <input type="password" value={form.pin} onChange={(e) => setForm((p) => ({ ...p, pin: e.target.value }))} className="karsa-login-input-with-icon min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" placeholder="Password" />
+            </span>
           </label>
           <button disabled={loading} className="mt-5 flex min-h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black uppercase tracking-wide text-white shadow-xl shadow-blue-100 active:scale-[0.98] disabled:opacity-60">
             {loading ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
-            Masuk Panel Admin
+            Masuk
           </button>
-          <p className="mt-4 text-center text-xs font-semibold leading-relaxed text-slate-400">Login admin dibaca dari Firebase: karsa_absensi/admin_users. Role super_admin/developer dapat membuka Developer Mode.</p>
         </form>
       </div>
     </div>
